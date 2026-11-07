@@ -1,12 +1,14 @@
 import { createServer } from "node:http";
 import { randomBytes, createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, extname, join, normalize } from "node:path";
+import { dirname, extname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
-const DATA_DIR = join(ROOT, process.env.DATA_DIR || ".data");
+const DATA_DIR = process.env.DATA_DIR
+  ? (isAbsolute(process.env.DATA_DIR) ? process.env.DATA_DIR : join(ROOT, process.env.DATA_DIR))
+  : join(ROOT, ".data");
 const STORE_FILE = join(DATA_DIR, "store.json");
 const MAX_BODY = 45_000;
 const SESSION_DAYS = Math.max(1, Number(process.env.SESSION_DAYS || 30));
