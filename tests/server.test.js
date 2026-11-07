@@ -86,3 +86,14 @@ test("saved reports are persisted for the browser session", async () => {
   assert.equal(data.reports.length, 1);
   assert.equal(data.reports[0].title, "Test report");
 });
+
+test("static hosting does not expose the JSON report store", async () => {
+  const response = await fetch(base + "/.data/store.json", { headers: cookie ? { cookie } : {} });
+  assert.equal(response.status, 404);
+});
+
+test("landing page is served from the same origin", async () => {
+  const response = await fetch(base + "/");
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /Know who's behind the offer/);
+});
