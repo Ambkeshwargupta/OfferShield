@@ -179,13 +179,20 @@ function pageHeaders(res) {
 }
 function serveFile(req,res) {
   const pathname=new URL(req.url,"http://localhost").pathname;
-  const requested=pathname==="/"?"/index.html":pathname;
-  const resolved=normalize(join(ROOT,requested));
-  if(!resolved.startsWith(ROOT)) return json(res,403,{error:"Forbidden"});
+  // Explicit allowlist: never expose server code, environment files, docs or .data/store.json.
+  const allowed=new Map([
+    ["/","index.html"],
+    ["/index.html","index.html"],
+    ["/favicon.svg","favicon.svg"],
+    ["/robots.txt","robots.txt"]
+  ]);
+  const filename=allowed.get(pathname);
+  if(!filename) return json(res,404,{error:"Not found"});
+  const resolved=join(ROOT,filename);
   try {
     const content=readFileSync(resolved);
     const ext=extname(resolved);
-    const types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8",".svg":"image/svg+xml"};
+    const types={".html":"text/html; charset=utf-8",".svg":"image/svg+xml",".txt":"text/plain; charset=utf-8"};
     res.writeHead(200,{"Content-Type":types[ext]||"application/octet-stream","Cache-Control":ext===".html"?"no-cache":"public, max-age=3600"});
     res.end(content);
   } catch { json(res,404,{error:"Not found"}); }
