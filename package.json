@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "description": "India-first company and recruitment due-diligence platform",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check tests/analysis.test.js"
+    "check": "node --check server.js && node --check tests/analysis.test.js && node --check tests/server.test.js"
   }
 }
