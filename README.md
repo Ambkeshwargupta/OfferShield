@@ -41,7 +41,7 @@ The server stores saved report metadata and extracted indicators in `.data/store
 
 ## Current product functionality
 
-- Search a small curated set of company reference profiles.
+- Search a small curated set of company reference profiles, with a free live Wikidata discovery fallback for names outside that set and a manual investigation route when no open-data match is found.
 - Review published company websites, careers pages, LinkedIn company page links and recruitment fraud advisories.
 - Browse official government and company-owned source links for MCA, Data.gov.in, GST, Udyam, EPFO, NCS and cybercrime reporting.
 - Paste recruitment message / offer text and extract email addresses, URLs/domains, phone numbers, role clues, CIN/GSTIN patterns and payment-related phrases.
@@ -54,6 +54,7 @@ The server stores saved report metadata and extracted indicators in `.data/store
 
 - The company catalogue is a small curated reference set; it is not a complete registry of Indian companies.
 - MCA, GST, Udyam and EPFO are linked as official manual verification sources. No live government API key or private data provider is configured.
+- Wikidata discovery is community-maintained and is not a government registry. Its results are candidate matches only; confirm legal name and registration status independently.
 - Company source links should be opened and rechecked at the time of use. A page being listed here is not proof that its content has not changed.
 - The parser analyses pasted text. It does not inspect raw email headers, SPF/DKIM/DMARC results, mailbox ownership, file signatures, or sender infrastructure.
 - Domain matching is a clue only; it does not authenticate the person sending a message.
