@@ -2,6 +2,7 @@
   "name": "offershield",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "India-first company and recruitment due-diligence platform",
   "engines": { "node": ">=20" },
   "scripts": {
