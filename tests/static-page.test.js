@@ -23,3 +23,16 @@ test("static Pages edition stores reports in the browser and does not require se
   assert.match(html, /function analyseStatic/);
   assert.match(html, /function DEMO_COMPANIES|const DEMO_COMPANIES/);
 });
+
+test("company search has an open-data fallback and manual path for unlisted companies", () => {
+  assert.match(html, /searchOpenDataCompanies/);
+  assert.match(html, /https:\/\/www\.wikidata\.org\/w\/api\.php\?action=wbsearchentities/);
+  assert.match(html, /openManualCompanyFromSearch/);
+  assert.match(html, /Investigate .* manually/);
+  assert.match(html, /No open-data match was returned/);
+});
+
+test("third-party website matches are not labelled as verified company domains", () => {
+  assert.match(html, /Domain matches a third-party listed website/);
+  assert.match(html, /does not authenticate the sender/);
+});
