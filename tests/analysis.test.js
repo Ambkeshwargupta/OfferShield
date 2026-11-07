@@ -1,5 +1,5 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
+import test from "node:test";
+import assert from "node:assert/strict";
 
 function domainOf(value) {
   try {
@@ -22,7 +22,7 @@ test("extracts email and URL domains", () => {
 });
 
 test("normalises www and email domains", () => {
-  assert.equal(domainOf("person@www.tcs.com"), "www.tcs.com");
+  assert.equal(domainOf("person@www.tcs.com"), "tcs.com");
   assert.equal(domainOf("https://www.tcs.com/careers"), "tcs.com");
 });
 
