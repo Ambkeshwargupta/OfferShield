@@ -15,7 +15,7 @@ test("GitHub Pages file includes the OfferShield product shell", () => {
 test("GitHub Pages app script parses as JavaScript", () => {
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
   assert.ok(scripts.length > 0, "Expected inline application script");
-  assert.doesNotThrow(() => new vm.Script(scripts[scripts.length - 1][1]));
+  try { new vm.Script(scripts[scripts.length - 1][1]); } catch (error) { assert.fail(error.stack); }
 });
 
 test("static Pages edition stores reports in the browser and does not require server API fetches", () => {
