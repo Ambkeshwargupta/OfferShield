@@ -2,28 +2,52 @@
 
 **Know who's behind the offer.**
 
-OfferShield is an India-first company and recruitment due-diligence prototype. A candidate can receive an offer through any channel, then use OfferShield to investigate the company, open official registration and careers sources, review company-published recruitment guidance, and compare message details with the information available.
+OfferShield is an India-first company and recruitment due-diligence platform. Candidates can investigate company identity, government-published master data, public digital footprint, recruitment guidance, official contacts, technical domains and email headers — then assemble an evidence-led report.
 
-> OfferShield is an investigation aid, not a fraud verdict, legal opinion, background check or guarantee that an offer is genuine. Company registration, a professional profile, a convincing document or a matching email domain does not prove that a specific recruiter or vacancy is authorised.
+> OfferShield is an investigation aid, not a fraud verdict, legal opinion, background check or guarantee that an offer is genuine. A legal registration, professional profile, convincing document, DNS record or matching email domain does not prove that a specific recruiter or vacancy is authorised.
 
-## What is in this repository
+## Architecture
 
-- `index.html` — responsive single-page web application and browser UI.
-- `server.js` — Node.js HTTP server, JSON API, reference company/source catalogue and report storage.
-- `tests/analysis.test.js` — Node built-in test suite.
-- `.github/workflows/ci.yml` — syntax and test checks on pushes and pull requests.
-- `DATA_SOURCES.md`, `PRIVACY.md`, `SECURITY.md` — source, privacy and security notes.
+- **GitHub Pages:** static premium website in `docs/`.
+- **Cloudflare Workers:** optional server-side intelligence API in `workers/api.js`.
+- **Cloudflare D1:** cache, source registry, company observations, public contact evidence and hashed-IP rate limits in `workers/schema.sql`.
+- **Node API:** standalone single-origin prototype in `server.js`.
+- **Tests:** Node built-in tests for the Node server, Worker API and browser page.
 
-The application has no third-party runtime dependencies. It is intentionally designed to run on a small Node hosting service without a paid AI API.
+## Current capability set
 
-## Run locally
+### Public website
+- Search the curated company profiles.
+- Search open-data company candidates through Wikidata.
+- Add a manual investigation for companies not found in structured sources.
+- Display official government and company-owned source links.
+- Analyse pasted offer/recruitment messages and compare domains with available company reference domains.
+- Save reports locally in the current browser.
+
+### Advanced intelligence UI
+- Search by company name, CIN, LLPIN, GSTIN or domain.
+- Connect a Cloudflare Worker backend through the Advanced Search settings.
+- Show MCA company master-data records separately from Wikidata discovery candidates.
+- Inspect DNS A/AAAA/MX/TXT/NS and DMARC, with public RDAP domain registration information.
+- Parse original email headers for From, Reply-To, Return-Path, Authentication-Results and DKIM selector clues.
+- Build public recruiter/contact cross-check routes without scraping restricted professional profiles.
+- Save combined investigation notes in local browser storage.
+
+### Cloudflare backend
+- MCA company master-data lookup through the official data.gov.in resource (free registered API key required).
+- Exact CIN/LLPIN and CompanyName filters.
+- Wikidata discovery candidates.
+- DNS-over-HTTPS and RDAP lookups.
+- Email header parser.
+- D1-backed API response cache and rate limit buckets when D1 is configured.
+
+## Run the Node prototype locally
 
 Requirements: Node.js 20 or later.
 
 ```bash
 git clone https://github.com/Ambkeshwargupta/OfferShield.git
 cd OfferShield
-cp .env.example .env
 npm run check
 npm test
 npm start
@@ -31,41 +55,41 @@ npm start
 
 Open http://localhost:3000.
 
-For live reload during development:
+The Node prototype stores browser-session report metadata in a local JSON file. It is for development and a single instance, not multi-user production.
 
-```bash
-npm run dev
-```
+## Deploy the scalable intelligence API
 
-The server stores saved report metadata and extracted indicators in `.data/store.json`. The `.data/` directory is git-ignored. Back it up or use persistent disk storage when deploying.
+Follow [workers/README.md](workers/README.md). In summary:
 
-## Current product functionality
+1. Create a Cloudflare account and authenticate Wrangler.
+2. Create a D1 database and apply `workers/schema.sql`.
+3. Add the D1 binding to `workers/wrangler.toml`.
+4. Obtain a free data.gov.in API key and store it using `wrangler secret put DATA_GOV_API_KEY`.
+5. Deploy the Worker.
+6. Paste the Worker URL into OfferShield → Advanced Search & Intelligence → API connection.
 
-- Search a small curated set of company reference profiles, with a free live Wikidata discovery fallback for names outside that set and a manual investigation route when no open-data match is found.
-- Review published company websites, careers pages, LinkedIn company page links and recruitment fraud advisories.
-- Browse official government and company-owned source links for MCA, Data.gov.in, GST, Udyam, EPFO, NCS and cybercrime reporting.
-- Paste recruitment message / offer text and extract email addresses, URLs/domains, phone numbers, role clues, CIN/GSTIN patterns and payment-related phrases.
-- Compare extracted domains with the selected company's published reference domains.
-- Explain matches, warning signals and missing information without assigning a fabricated fraud probability.
-- Save, reopen, print and delete an investigation report in the same browser session.
-- Load a synthetic demonstration message using the reserved `.example` domain.
+Never put the government API key in `docs/index.html`, browser local storage or GitHub.
 
-## Important limitations
+## Data source coverage and limitations
 
-- The company catalogue is a small curated reference set; it is not a complete registry of Indian companies.
-- MCA, GST, Udyam and EPFO are linked as official manual verification sources. No live government API key or private data provider is configured.
-- Wikidata discovery is community-maintained and is not a government registry. Its results are candidate matches only; confirm legal name and registration status independently.
-- Company source links should be opened and rechecked at the time of use. A page being listed here is not proof that its content has not changed.
-- The parser analyses pasted text. It does not inspect raw email headers, SPF/DKIM/DMARC results, mailbox ownership, file signatures, or sender infrastructure.
-- Domain matching is a clue only; it does not authenticate the person sending a message.
-- The app uses random browser-session ownership for saved reports, not registered user accounts. Shared-device use is not recommended.
-- JSON-file storage is intended for a single-instance prototype. Use a managed database, account authentication, stronger session controls, backups and persistent storage before multi-user production deployment.
-- No recruiter identity or telephone number is generated. Contacts appear only where a company-owned source explicitly publishes them.
+- MCA OGD company master data is a periodic snapshot distributed by data.gov.in. It is not a live MCA portal transaction.
+- The OGD name filter is exact; fuzzy matches are discovery candidates and require manual entity resolution.
+- The dataset does not authenticate a recruiter or a particular vacancy/offer.
+- GST and Udyam checks are linked to official manual portals in this release; no CAPTCHA bypass or unauthorised scraping is implemented.
+- EPFO is an official manual lookup link.
+- LinkedIn and job boards are linked for manual review; they are not scraped.
+- DNS/RDAP/SPF/DMARC signals describe technical records and do not establish company ownership or recruiter authority.
+- Pasted raw email headers can be altered; only original mailbox headers should be relied on, and authentication results are not proof of offer authority.
+- The GitHub Pages version saves reports in that browser only. Multi-user accounts and central report storage require a separate production backend and authentication layer.
 
-## Deployment
+## Deployment options
 
-Deploy the Node app to a host that supports persistent disk storage and an HTTP process. Set `NODE_ENV=production`, `PORT` if required by the host, and `DATA_DIR` to a persistent writable directory. GitHub Pages alone cannot run the API or persist reports.
+- GitHub Pages: public static site only.
+- Cloudflare Workers + D1: recommended scalable server-side intelligence layer.
+- Node server: local development and single-instance self-hosted deployment.
+
+See `DATA_SOURCES.md`, `SECURITY.md`, `PRIVACY.md`, `DEPLOYMENT.md` and `workers/README.md`.
 
 ## Project principle
 
-**Evidence before conclusions.** Distinguish official-source information, third-party reports, user-provided content, unknown information and conflicting evidence. A missing match is a coverage gap, not evidence of fraud.
+**Evidence before conclusions.** Separate government dataset records, official company statements, third-party discovery candidates, candidate-provided details, conflicting evidence and information not found. Missing data is a coverage gap, not evidence of fraud.
