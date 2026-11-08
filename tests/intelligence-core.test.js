@@ -51,3 +51,8 @@ test("recognises the published Udyam registration number structure", () => {
   assert.equal(classifyIdentifier("UDYAM-MH-19-0012345").type, "Udyam reference");
   assert.notEqual(classifyIdentifier("123456789012").type, "Udyam reference");
 });
+
+test("classifies email and website inputs as domains before company names", () => {
+  assert.deepEqual(classifyIdentifier("recruiter@careers.example.in"), { type:"Domain", value:"careers.example.in" });
+  assert.deepEqual(classifyIdentifier("https://www.example.in/jobs"), { type:"Domain", value:"example.in" });
+});
