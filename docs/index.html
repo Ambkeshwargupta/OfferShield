@@ -79,6 +79,7 @@
           <div class="eyebrow">03 · Original email investigation</div><h3 style="margin-top:5px">Analyse raw email headers</h3>
           <p class="small">Paste the original raw headers from your mailbox to inspect From, Reply-To, Return-Path and reported SPF/DKIM/DMARC results.</p>
           <div class="field" style="margin-top:15px"><label for="expectedRecruitmentDomain">Company-published recruitment domain (optional)</label><input id="expectedRecruitmentDomain" placeholder="e.g. company.com"></div>
+          <div class="note" style="margin-bottom:10px">Privacy: when the Cloudflare Worker is connected, pasted raw headers are sent to that Worker for parsing and are not intentionally stored. Redact personal details and only use a Worker deployment you control.</div>
           <div class="field"><label for="rawEmailHeaders">Raw email headers</label><textarea id="rawEmailHeaders" style="min-height:145px" placeholder="From: Recruiter <person@company.com>&#10;Reply-To: ...&#10;Authentication-Results: ...&#10;Received: ..."></textarea></div>
           <button class="btn primary" id="headerCheckBtn">Analyse headers →</button>
           <div id="headerResult" style="margin-top:15px"></div>
@@ -93,6 +94,10 @@
           </div>
           <button class="btn primary" id="recruiterCheckBtn">Build public cross-checks →</button>
           <div id="recruiterResult" style="margin-top:15px"></div>
+          <div class="divider"></div>
+          <div class="field"><label for="footprintRole">Role or internship title (optional)</label><input id="footprintRole" placeholder="e.g. Software Developer Intern"></div>
+          <button class="btn" id="recruitmentFootprintBtn">Find public hiring footprint →</button>
+          <div id="footprintResult" style="margin-top:12px"></div>
         </div>
       </div>
 
@@ -397,6 +402,19 @@ async function runHeaderCheck(){
  const values=[["From",data.from],["Reply-To",data.replyTo||data.reply],["Return-Path",data.returnPath],["SPF",data.spf],["DKIM",data.dkim],["DMARC",data.dmarc],["Sender-domain comparison",data.companyDomainComparison?.state||"No reference domain supplied"],["Reply-To mismatch",data.replyToMismatch===true?"Review required":data.replyMismatch===true?"Review required":"Not indicated"],["Return-Path mismatch",data.returnPathMismatch===true?"Review required":"Not indicated"]];
  $("#headerResult").innerHTML='<div class="detail-list">'+values.map(x=>'<div class="detail-row"><span>'+esc(x[0])+'</span><b>'+esc(x[1]||"Not reported")+'</b></div>').join("")+'</div><div class="note" style="margin-top:10px">Header text can be edited before pasting. Check the original raw headers from the mailbox. SPF/DKIM/DMARC results do not prove that the named recruiter works for the company or that the offer is authorised.</div>'+(data.replyMismatch?'<div class="note" style="margin-top:8px">Reply-To differs from the parsed sender domain. Investigate the discrepancy; this alone does not prove fraud.</div>':"")+(data.workerNote?'<div class="small muted">'+esc(data.workerNote)+'</div>':"");
 }
+function buildRecruitmentFootprint(){
+ const company=$("#recruiterCompany").value.trim(),role=$("#footprintRole").value.trim();
+ if(!company){toast("Enter a claimed company first.");return}
+ const q=encodeURIComponent([company,role].filter(Boolean).join(" "));
+ const links=[
+  ["Company careers pages","https://www.google.com/search?q="+q+"+official+careers"],
+  ["LinkedIn job listings","https://www.linkedin.com/jobs/search/?keywords="+q],
+  ["Indeed public listings","https://in.indeed.com/jobs?q="+q],
+  ["Naukri job listings","https://www.naukri.com/"+encodeURIComponent([role,company].filter(Boolean).join("-")).toLowerCase()+"-jobs"],
+  ["Recent recruitment announcements","https://www.google.com/search?q="+q+"+hiring+announcement"]
+ ];
+ $("#footprintResult").innerHTML='<div class="note">These are independent public-search links. Search results may be outdated, copied or impersonated; compare any vacancy with the company&#39;s own careers site.</div><div class="quick">'+links.map(x=>'<a class="btn" target="_blank" rel="noopener noreferrer" href="'+esc(x[1])+'">'+esc(x[0])+' ↗</a>').join("")+'</div>';
+}
 function buildRecruiterChecks(){
  const name=$("#recruiterName").value.trim(),company=$("#recruiterCompany").value.trim(),email=$("#recruiterEmail").value.trim();if(!name||!company){toast("Enter the recruiter name and claimed company.");return}
  const q=encodeURIComponent('"'+name+'" "'+company+'"');
@@ -488,6 +506,7 @@ $("#domainCheckBtn").onclick=runDomainCheck;
 $("#advancedDomain").addEventListener("keydown",e=>{if(e.key==="Enter")runDomainCheck()});
 $("#headerCheckBtn").onclick=runHeaderCheck;
 $("#recruiterCheckBtn").onclick=buildRecruiterChecks;
+$("#recruitmentFootprintBtn").onclick=buildRecruitmentFootprint;
 $("#saveAdvancedReport").onclick=saveAdvancedReport;
 const advancedNav=document.createElement("button");advancedNav.className="btn";advancedNav.textContent="Advanced investigation →";advancedNav.dataset.goto="advanced";$("#homeCompanies").parentElement.insertAdjacentElement("afterend",advancedNav);
 init();
