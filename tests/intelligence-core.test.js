@@ -46,3 +46,8 @@ test("distinguishes consistent, lookalike and unknown domains", () => {
   assert.equal(compareDomains("examp1e.com",["example.com"]).state,"lookalike_candidate");
   assert.equal(compareDomains("randomsite.in",["example.com"]).state,"not_in_reference_set");
 });
+
+test("recognises the published Udyam registration number structure", () => {
+  assert.equal(classifyIdentifier("UDYAM-MH-19-0012345").type, "Udyam reference");
+  assert.notEqual(classifyIdentifier("123456789012").type, "Udyam reference");
+});
