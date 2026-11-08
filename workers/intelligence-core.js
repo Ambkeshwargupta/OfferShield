@@ -20,7 +20,7 @@ export function classifyIdentifier(value) {
   if (/^[A-Z0-9]{21}$/.test(v) && /^[LU]/.test(v)) return { type: "CIN", value: v };
   if (/^[A-Z]{3}-\d{4}$/.test(v)) return { type: "LLPIN", value: v };
   if (/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(v)) return { type: "GSTIN", value: v };
-  if (/^\d{12}$/.test(v)) return { type: "Udyam reference (format only)", value: v };
+  if (/^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/.test(v)) return { type: "Udyam reference", value: v };
   if (/^[A-Z0-9 .&'()-]{3,120}$/.test(v)) return { type: "Company name", value: v };
   return { type: "Unknown", value: v };
 }
