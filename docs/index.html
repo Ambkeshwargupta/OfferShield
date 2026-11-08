@@ -95,6 +95,8 @@
         </div>
       </div>
 
+
+      <div class="card" style="margin-top:16px"><div class="result-head"><div><h3>Save an advanced investigation</h3><p class="small">Save a summary of the current search, domain and email-header panels in this browser.</p></div><button class="btn primary" id="saveAdvancedReport">Save combined report</button></div></div>
       <div class="note" style="margin-top:17px"><strong>Evidence boundary:</strong> OGD company master data is a periodic government-published snapshot, not a live MCA transaction. DNS, RDAP, SPF, DKIM and DMARC are technical signals; they do not validate job offers. LinkedIn and job portals are linked for manual review; restricted profiles are not scraped. GST and Udyam verification remain manual official-portal checks in this release.</div>
     </section>
 
@@ -478,6 +480,7 @@ $("#domainCheckBtn").onclick=runDomainCheck;
 $("#advancedDomain").addEventListener("keydown",e=>{if(e.key==="Enter")runDomainCheck()});
 $("#headerCheckBtn").onclick=runHeaderCheck;
 $("#recruiterCheckBtn").onclick=buildRecruiterChecks;
+$("#saveAdvancedReport").onclick=saveAdvancedReport;
 const advancedNav=document.createElement("button");advancedNav.className="btn";advancedNav.textContent="Advanced investigation →";advancedNav.dataset.goto="advanced";$("#homeCompanies").parentElement.insertAdjacentElement("afterend",advancedNav);
 init();
 </script>
