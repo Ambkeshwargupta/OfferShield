@@ -350,7 +350,8 @@ async function runAdvancedSearch(){
    data.localProfiles=localProfiles;
   }else{
    const matchCIN=/^[LU][A-Z0-9]{20}$/i.test(query),matchLLP=/^[A-Z]{3}-\d{4}$/i.test(query),matchGST=/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/i.test(query),matchUdyam=/^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/i.test(query);
-   const maybeDomain=/^(?:[^\s@]+@)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(query);
+   const domainCandidate=query.includes("@")?query.slice(query.lastIndexOf("@")+1):query.replace(/^https?:\/\//i,"").split(/[/?#]/)[0].replace(/^www\./i,"");
+   const maybeDomain=/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(domainCandidate);
    if(maybeDomain){$("#advancedDomain").value=query;data={query,registry:[],registryConfigured:false,discovery:[],domain:query,localProfiles}}
    else if(matchCIN||matchLLP||matchGST||matchUdyam){
     data={query,registry:[],registryConfigured:false,discovery:[],localProfiles,registryError:{message:"Connect the Cloudflare Worker and configure DATA_GOV_API_KEY for automated MCA dataset lookup. GST and Udyam remain official manual verification workflows."},manualLookup:matchGST?"https://services.gst.gov.in/services/searchtp":matchUdyam?"https://udyamregistration.gov.in/Udyam_Verify.aspx":"https://www.mcacdm.nic.in/company-master-details"};
@@ -515,7 +516,7 @@ $("#headerCheckBtn").onclick=runHeaderCheck;
 $("#recruiterCheckBtn").onclick=buildRecruiterChecks;
 $("#recruitmentFootprintBtn").onclick=buildRecruitmentFootprint;
 $("#saveAdvancedReport").onclick=saveAdvancedReport;
-const advancedNav=document.createElement("button");advancedNav.className="btn";advancedNav.textContent="Advanced investigation →";advancedNav.dataset.goto="advanced";$("#homeCompanies").parentElement.insertAdjacentElement("afterend",advancedNav);
+const advancedNav=document.createElement("button");advancedNav.className="btn";advancedNav.textContent="Advanced investigation →";advancedNav.dataset.goto="advanced";advancedNav.onclick=()=>go("advanced");$("#homeCompanies").parentElement.insertAdjacentElement("afterend",advancedNav);
 init();
 </script>
 </body></html>
