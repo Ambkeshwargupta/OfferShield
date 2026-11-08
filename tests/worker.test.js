@@ -43,3 +43,20 @@ test("allows the OfferShield Pages origin", async()=>{
   const response=await worker.fetch(request,env(),ctx);
   assert.equal(response.status,200);
 });
+
+test("routes an email-domain search to domain intelligence, not company-name OGD", async()=>{
+  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/search?q=recruiter%40careers.example.in"),env(),ctx);
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.domain,"careers.example.in");
+  assert.equal(body.identifier.type,"Domain");
+});
+
+test("does not send an LLPIN into the CIN-only MCA OGD filter", async()=>{
+  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/search?q=AAB-1234"),env({}),ctx);
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.identifier.type,"LLPIN");
+  assert.equal(body.registryConfigured,false);
+  assert.ok(body.notes[0].includes("not incorrectly sent as a CIN filter"));
+});
