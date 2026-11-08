@@ -78,7 +78,8 @@
         <div class="card">
           <div class="eyebrow">03 · Original email investigation</div><h3 style="margin-top:5px">Analyse raw email headers</h3>
           <p class="small">Paste the original raw headers from your mailbox to inspect From, Reply-To, Return-Path and reported SPF/DKIM/DMARC results.</p>
-          <div class="field" style="margin-top:15px"><label for="rawEmailHeaders">Raw email headers</label><textarea id="rawEmailHeaders" style="min-height:145px" placeholder="From: Recruiter <person@company.com>&#10;Reply-To: ...&#10;Authentication-Results: ...&#10;Received: ..."></textarea></div>
+          <div class="field" style="margin-top:15px"><label for="expectedRecruitmentDomain">Company-published recruitment domain (optional)</label><input id="expectedRecruitmentDomain" placeholder="e.g. company.com"></div>
+          <div class="field"><label for="rawEmailHeaders">Raw email headers</label><textarea id="rawEmailHeaders" style="min-height:145px" placeholder="From: Recruiter <person@company.com>&#10;Reply-To: ...&#10;Authentication-Results: ...&#10;Received: ..."></textarea></div>
           <button class="btn primary" id="headerCheckBtn">Analyse headers →</button>
           <div id="headerResult" style="margin-top:15px"></div>
         </div>
@@ -323,27 +324,34 @@ function candidateFromWikidata(item){
 function renderAdvancedResults(data,query){
  const official=(data.registry||[]).map(registryCandidate);
  const discovery=(data.discovery||[]).map(candidateFromWikidata);
- const results=[...official,...discovery];
+ const local=(data.localProfiles||[]);
  const message=official.length?'<div class="note"><strong>Official dataset match:</strong> The following records came from the MCA company master-data resource distributed through data.gov.in. This is a periodic snapshot, not a live MCA portal query.</div>':data.registryConfigured===false?'<div class="note">Official MCA dataset API is not configured on the Worker yet. Connect the backend and add a free data.gov.in key as a Worker secret to enable registry lookups.</div>':"";
- const cards=results.map(c=>'<article class="company-card" data-company="'+esc(c.id)+'"><div class="co-logo">'+esc(initials(c.name))+'</div><div style="min-width:0;flex:1"><h3>'+esc(c.name)+'</h3><p>'+esc(c.identifier||c.sector||"Discovery candidate")+' · '+esc(c.status||c.evidenceStatus||"Not verified")+'</p><div class="quick"><span class="tag '+(c.isRegistry?"official":"demo")+'">'+(c.isRegistry?"MCA dataset record":"Third-party discovery candidate")+'</span></div></div><span style="color:#9aa5b7">↗</span></article>').join("");
- const manual='<div class="note" style="margin-top:11px">No result is not proof that a business is fake. Search the legal name, CIN or LLPIN in the official MCA portal and consider brand/subsidiary relationships.</div><div class="quick"><button class="btn" data-manual-company="'+esc(query)+'">Start manual company investigation</button><a class="btn" target="_blank" rel="noopener noreferrer" href="https://www.mcacdm.nic.in/company-master-details">Open MCA lookup ↗</a><a class="btn" target="_blank" rel="noopener noreferrer" href="https://www.data.gov.in/catalog/company-master-data">Open MCA dataset ↗</a></div>';
- $("#advancedSearchResult").innerHTML=message+(cards?'<div class="company-grid" style="margin-top:12px">'+cards+'</div>':'<div class="empty"><b>No structured company match returned</b>Try a different legal name or an exact CIN/LLPIN.</div>')+manual+(data.registryError?'<div class="note" style="margin-top:10px">Registry connector note: '+esc(data.registryError.message||data.registryError.code)+'</div>':'');
+ const localCards=local.map(c=>'<article class="company-card" data-company="'+esc(c.id)+'"><div class="co-logo">'+esc(initials(c.name))+'</div><div style="min-width:0;flex:1"><h3>'+esc(c.name)+'</h3><p>'+esc(c.legalName||c.sector)+'</p><div class="quick"><span class="tag official">Company-source reference profile</span></div></div><span style="color:#9aa5b7">↗</span></article>').join("");
+ const cards=[...official.map(c=>'<article class="company-card" data-company="'+esc(c.id)+'"><div class="co-logo">'+esc(initials(c.name))+'</div><div style="min-width:0;flex:1"><h3>'+esc(c.name)+'</h3><p>'+esc(c.identifier||c.sector||"MCA company master data")+' · '+esc(c.status||"Status not supplied")+'</p><div class="quick"><span class="tag official">MCA dataset record</span></div></div><span style="color:#9aa5b7">↗</span></article>'),...discovery.map(c=>'<article class="company-card" data-company="'+esc(c.id)+'"><div class="co-logo">'+esc(initials(c.name))+'</div><div style="min-width:0;flex:1"><h3>'+esc(c.name)+'</h3><p>'+esc(c.sector||"Community-maintained public knowledge entry")+'</p><div class="quick"><span class="tag demo">Third-party discovery candidate</span></div></div><span style="color:#9aa5b7">↗</span></article>')].join("");
+ if(data.domain){$("#advancedDomain").value=data.domain;$("#advancedSearchResult").innerHTML='<div class="note">The search value was recognised as a domain. Running DNS, mail-security and RDAP checks in the domain module.</div>';runDomainCheck();return}
+ const manual='<div class="note" style="margin-top:11px">No result is not proof that a business is fake. Search the legal name, CIN or LLPIN in the official MCA portal and consider brand/subsidiary relationships.</div><div class="quick"><button class="btn" data-manual-company="'+esc(query)+'">Start manual company investigation</button><a class="btn" target="_blank" rel="noopener noreferrer" href="https://www.mcacdm.nic.in/company-master-details">Open MCA lookup ↗</a><a class="btn" target="_blank" rel="noopener noreferrer" href="https://www.data.gov.in/catalog/company-master-data">Open MCA dataset ↗</a>'+(data.manualLookup?'<a class="btn" target="_blank" rel="noopener noreferrer" href="'+esc(data.manualLookup)+'">Open relevant official lookup ↗</a>':"")+'</div>';
+ $("#advancedSearchResult").innerHTML=message+(localCards?'<div class="small muted" style="margin:10px 0 6px">Curated company profiles</div><div class="company-grid">'+localCards+'</div>':"")+(cards?'<div class="small muted" style="margin:10px 0 6px">Government dataset and open-data candidates</div><div class="company-grid">'+cards+'</div>':'<div class="empty"><b>No structured external company match returned</b>Try a different legal name or an exact CIN/LLPIN.</div>')+manual+(data.registryError?'<div class="note" style="margin-top:10px">Registry connector note: '+esc(data.registryError.message||data.registryError.code)+'</div>':"");
 }
 async function runAdvancedSearch(){
  const query=$("#advancedQuery").value.trim();if(query.length<2){toast("Enter a company name or identifier.");return}
  const button=$("#advancedSearchBtn");button.disabled=true;button.textContent="Searching sources…";
  $("#advancedSearchResult").innerHTML='<div class="loading">Checking registry and discovery sources…</div>';
  try{
+  const q=query.toLowerCase();
+  const localProfiles=companies.filter(c=>[c.name,c.legalName,c.sector,...(c.domains||[])].join(" ").toLowerCase().includes(q));
   let data;
   if(workerApiBase()){
    data=await workerRequest("/v1/search?q="+encodeURIComponent(query));
+   data.localProfiles=localProfiles;
   }else{
-   const matchCIN=/^[LU][A-Z0-9]{20}$/i.test(query),matchLLP=/^[A-Z]{3}-\d{4}$/i.test(query),matchGST=/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/i.test(query);
-   if(matchCIN||matchLLP||matchGST){
-    data={query,registry:[],registryConfigured:false,discovery:[],registryError:{message:"Connect the Cloudflare Worker and configure DATA_GOV_API_KEY for automated MCA dataset lookup. GST remains an official manual verification workflow."}};
+   const matchCIN=/^[LU][A-Z0-9]{20}$/i.test(query),matchLLP=/^[A-Z]{3}-\d{4}$/i.test(query),matchGST=/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/i.test(query),matchUdyam=/^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/i.test(query);
+   const maybeDomain=/^(?:[^\s@]+@)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(query);
+   if(maybeDomain){$("#advancedDomain").value=query;data={query,registry:[],registryConfigured:false,discovery:[],domain:query,localProfiles}}
+   else if(matchCIN||matchLLP||matchGST||matchUdyam){
+    data={query,registry:[],registryConfigured:false,discovery:[],localProfiles,registryError:{message:"Connect the Cloudflare Worker and configure DATA_GOV_API_KEY for automated MCA dataset lookup. GST and Udyam remain official manual verification workflows."},manualLookup:matchGST?"https://services.gst.gov.in/services/searchtp":matchUdyam?"https://udyamregistration.gov.in/Udyam_Verify.aspx":"https://www.mcacdm.nic.in/company-master-details"};
    }else{
     const matches=await searchOpenDataCompanies(query);
-    data={query,registry:[],registryConfigured:false,discovery:[...dynamicCompanies.values()].filter(x=>x.wikidataId).map(x=>({id:x.wikidataId,name:x.name,description:x.sector,entityUrl:x.wikidataUrl})).slice(0,8)};
+    data={query,registry:matches.filter(x=>x.isRegistry).map(x=>({identifier:x.identifier,name:x.name,status:x.status,evidenceStatus:x.evidenceStatus,sourceUrl:x.sourceUrl})),registryConfigured:false,discovery:matches.filter(x=>!x.isRegistry).map(x=>({id:x.wikidataId||x.id.replace(/^wd-/,""),name:x.name,description:x.sector,entityUrl:x.wikidataUrl})),localProfiles};
    }
   }
   renderAdvancedResults(data,query);
@@ -384,9 +392,9 @@ function parseHeadersInBrowser(raw){
 async function runHeaderCheck(){
  const raw=$("#rawEmailHeaders").value.trim();if(raw.length<20){toast("Paste the original raw email headers.");return}
  let data;
- try{data=workerApiBase()?await workerRequest("/v1/email/headers",{method:"POST",body:JSON.stringify({headers:raw,expectedDomains:[]})}):parseHeadersInBrowser(raw)}
+ try{data=workerApiBase()?await workerRequest("/v1/email/headers",{method:"POST",body:JSON.stringify({headers:raw,expectedDomains:$("#expectedRecruitmentDomain").value.trim()?[$("#expectedRecruitmentDomain").value.trim()]:[]})}):parseHeadersInBrowser(raw)}
  catch(error){data=parseHeadersInBrowser(raw);data.workerNote=error.message}
- const values=[["From",data.from],["Reply-To",data.replyTo||data.reply],["Return-Path",data.returnPath],["SPF",data.spf],["DKIM",data.dkim],["DMARC",data.dmarc]];
+ const values=[["From",data.from],["Reply-To",data.replyTo||data.reply],["Return-Path",data.returnPath],["SPF",data.spf],["DKIM",data.dkim],["DMARC",data.dmarc],["Sender-domain comparison",data.companyDomainComparison?.state||"No reference domain supplied"],["Reply-To mismatch",data.replyToMismatch===true?"Review required":data.replyMismatch===true?"Review required":"Not indicated"],["Return-Path mismatch",data.returnPathMismatch===true?"Review required":"Not indicated"]];
  $("#headerResult").innerHTML='<div class="detail-list">'+values.map(x=>'<div class="detail-row"><span>'+esc(x[0])+'</span><b>'+esc(x[1]||"Not reported")+'</b></div>').join("")+'</div><div class="note" style="margin-top:10px">Header text can be edited before pasting. Check the original raw headers from the mailbox. SPF/DKIM/DMARC results do not prove that the named recruiter works for the company or that the offer is authorised.</div>'+(data.replyMismatch?'<div class="note" style="margin-top:8px">Reply-To differs from the parsed sender domain. Investigate the discrepancy; this alone does not prove fraud.</div>':"")+(data.workerNote?'<div class="small muted">'+esc(data.workerNote)+'</div>':"");
 }
 function buildRecruiterChecks(){
