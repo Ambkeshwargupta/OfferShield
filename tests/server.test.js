@@ -97,3 +97,10 @@ test("landing page is served from the same origin", async () => {
   assert.equal(response.status, 200);
   assert.match(await response.text(), /Know who's behind the offer/);
 });
+
+test("local Node homepage serves the current advanced OfferShield interface", async () => {
+  const response = await fetch(base + "/");
+  const body = await response.text();
+  assert.match(body, /Advanced search &amp; intelligence|Advanced search & intelligence/);
+  assert.match(body, /rawEmailHeaders/);
+});
