@@ -3,8 +3,7 @@ import {
   resolveCompanyCandidates, parseEmailHeaders, compareDomains
 } from "./intelligence-core.js";
 
-const OGD_RESOURCE = "4dbe5667-7b6b-41d7-82af-211562424d9a";
-const OGD_URL = "https://api.data.gov.in/resource/" + OGD_RESOURCE;
+const DEFAULT_OGD_RESOURCE = "4dbe5667-7b6b-41d7-82af-211562424d9a";
 const ALLOWED_ORIGINS = new Set([
   "https://ambkeshwargupta.github.io",
   "http://localhost:3000",
@@ -30,10 +29,12 @@ function response(data, status = 200, origin = "*") {
 function jsonError(message, status = 400, origin = "*", code = "bad_request") {
   return response({ error: { code, message } }, status, origin);
 }
-function corsOrigin(request) {
+function corsOrigin(request, env = {}) {
   const origin = request.headers.get("Origin");
   if (!origin) return "*";
-  return ALLOWED_ORIGINS.has(origin) || origin.endsWith(".workers.dev") ? origin : null;
+  const configured = String(env.ALLOWED_ORIGINS || "").split(",").map(x => x.trim()).filter(Boolean);
+  const allowed = new Set([...ALLOWED_ORIGINS, ...configured]);
+  return allowed.has(origin) ? origin : null;
 }
 function validPublicDomain(value) {
   const domain = normalizeDomain(value);
@@ -73,7 +74,9 @@ async function ogdLookup(env, field, value, limit = 10) {
   const cacheKey = "ogd:" + safeField + ":" + q.toUpperCase();
   const cached = await cachedGet(env, cacheKey);
   if (cached) return { configured: true, records: cached, cached: true };
-  const url = new URL(OGD_URL);
+  const resourceId = String(env.DATA_GOV_RESOURCE_ID || DEFAULT_OGD_RESOURCE).trim();
+  if (!/^[a-f0-9-]{36}$/i.test(resourceId)) throw new Error("DATA_GOV_RESOURCE_ID must be a valid UUID.");
+  const url = new URL("https://api.data.gov.in/resource/" + resourceId);
   url.searchParams.set("api-key", env.DATA_GOV_API_KEY);
   url.searchParams.set("format", "json");
   url.searchParams.set("limit", String(Math.max(1, Math.min(limit, 100))));
@@ -206,7 +209,7 @@ function headerAnalysis(raw, expectedDomains = []) {
   };
 }
 async function route(request, env) {
-  const origin = corsOrigin(request);
+  const origin = corsOrigin(request, env);
   if (origin === null) return jsonError("Origin not allowed.", 403, "null", "origin_not_allowed");
   if (request.method === "OPTIONS") return new Response(null, { status:204, headers:{"access-control-allow-origin":origin,"access-control-allow-methods":"GET,POST,OPTIONS","access-control-allow-headers":"content-type","access-control-max-age":"86400","vary":"Origin"} });
   const url = new URL(request.url);
@@ -259,7 +262,7 @@ export default {
   async fetch(request, env) {
     try { return await route(request,env); }
     catch (error) {
-      return jsonError("The intelligence service encountered an unexpected error. Please retry.",500,corsOrigin(request)||"*","internal_error");
+      return jsonError("The intelligence service encountered an unexpected error. Please retry.",500,corsOrigin(request,env)||"*","internal_error");
     }
   }
 };
