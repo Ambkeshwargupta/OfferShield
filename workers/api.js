@@ -147,15 +147,21 @@ function companyResponse(record, evidenceStatus = "official_dataset_record") {
 }
 async function resolveSearch(query, env) {
   const identifier = classifyIdentifier(query);
-  if (identifier.type === "CIN" || identifier.type === "LLPIN") {
+  if (identifier.type === "CIN") {
     const ogd = await ogdLookup(env, "CIN", identifier.value, 5);
     return { query, identifier, registry: ogd.records.map(r => companyResponse(r)), registryConfigured: ogd.configured, registryError: ogd.error || null, discovery: [], manualLookup: "https://www.mcacdm.nic.in/company-master-details" };
+  }
+  if (identifier.type === "LLPIN") {
+    return { query, identifier, registry: [], registryConfigured: false, registryError: null, discovery: [], manualLookup: "https://www.mcacdm.nic.in/company-master-details", notes: ["This Worker connector is for the MCA company master-data resource keyed by CIN. LLPIN lookup remains an official manual MCA verification step; it is not incorrectly sent as a CIN filter."] };
   }
   if (identifier.type === "Udyam reference") {
     return { query, identifier, registry: [], registryConfigured: false, discovery: [], manualLookup: "https://udyamregistration.gov.in/Udyam_Verify.aspx", notes: ["Udyam verification remains a manual official-portal step in this release."] };
   }
   const domain = validPublicDomain(query);
   if (domain) return { query, identifier, registry: [], registryConfigured: false, discovery: [], domain, manualLookup: "https://www.mcacdm.nic.in/company-master-details" };
+  if (identifier.type === "Domain") {
+    return { query, identifier, registry: [], registryConfigured: false, discovery: [], domain: identifier.value, manualLookup: "https://www.mcacdm.nic.in/company-master-details" };
+  }
   if (identifier.type === "Company name") {
     const ogd = await ogdLookup(env, "CompanyName", identifier.value, 5);
     const discovery = await wikidataSearch(query);
@@ -248,7 +254,7 @@ async function route(request, env) {
   if (request.method === "GET" && url.pathname.startsWith("/v1/company/")) {
     const identifier = decodeURIComponent(url.pathname.slice("/v1/company/".length));
     const parsed = classifyIdentifier(identifier);
-    if (!["CIN","LLPIN"].includes(parsed.type)) return jsonError("Enter a valid CIN or LLPIN.",400,origin,"invalid_identifier");
+    if (parsed.type !== "CIN") return jsonError("This endpoint currently supports CIN only. LLPIN records require the official MCA LLP lookup.",400,origin,"invalid_identifier");
     const ogd = await ogdLookup(env,"CIN",parsed.value,5);
     return response({ query:parsed.value, records:ogd.records.map(r=>companyResponse(r)), configured:ogd.configured, error:ogd.error||null, sourceUrl:"https://www.data.gov.in/catalog/company-master-data", manualLookup:"https://www.mcacdm.nic.in/company-master-details" },200,origin);
   }
