@@ -15,3 +15,6 @@ ALLOWED_ORIGINS = "https://ambkeshwargupta.github.io,http://localhost:3000,http:
 
 # Store DATA_GOV_API_KEY as a Worker secret, never in this file:
 # npx wrangler secret put DATA_GOV_API_KEY
+
+[triggers]
+crons = ["15 3 * * *"]
