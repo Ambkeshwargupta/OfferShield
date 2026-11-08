@@ -29,7 +29,7 @@ test("company search has an open-data fallback and manual path for unlisted comp
   assert.match(html, /https:\/\/www\.wikidata\.org\/w\/api\.php\?action=wbsearchentities/);
   assert.match(html, /openManualCompanyFromSearch/);
   assert.match(html, /Investigate .* manually/);
-  assert.match(html, /No open-data match was returned/);
+  assert.match(html, /No result is not proof that a business is fake/);
 });
 
 test("third-party website matches are not labelled as verified company domains", () => {
