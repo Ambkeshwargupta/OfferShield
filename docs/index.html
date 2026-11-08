@@ -21,6 +21,7 @@
   <div class="navlabel">Workspace</div>
   <nav class="nav">
     <button class="active" data-page="overview"><span class="ico">▦</span>Overview</button>
+    <button data-page="advanced"><span class="ico">⌘</span>Advanced search & intelligence</button>
     <button data-page="companies"><span class="ico">◫</span>Company intelligence</button>
     <button data-page="investigate"><span class="ico">⌕</span>Investigate an offer</button>
     <button data-page="reports"><span class="ico">▤</span>Saved investigations</button>
@@ -45,6 +46,56 @@
       <div class="section-title"><h2>Company reference profiles</h2><button class="btn" data-goto="companies">View directory →</button></div>
       <div class="company-grid" id="homeCompanies"><div class="loading">Loading company references…</div></div>
       <div class="note" style="margin-top:18px"><strong>Important:</strong> Company registration confirms a legal-entity record, not the authority of a recruiter or the authenticity of a specific offer. A matching email domain is a consistency clue, not sender authentication.</div>
+    </section>
+
+    <section class="page" id="page-advanced">
+      <div class="page-head"><div><div class="eyebrow">Multi-source investigation workspace</div><h1>Advanced search & intelligence</h1><div class="subhead">Search company identity, inspect public registration data, investigate domains and analyse original email headers. Each result shows what its source can — and cannot — establish.</div></div><span class="tag official">Evidence-led tools</span></div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="result-head"><div><h3>Intelligence API connection</h3><p class="small">Connect the scalable Cloudflare Worker backend. The API URL is public; its government-data key stays server-side as a Worker secret.</p></div><span class="tag" id="workerStatus">Browser fallback</span></div>
+        <div class="searchline" style="margin-bottom:5px"><input id="workerApiUrl" placeholder="https://offershield-intelligence.your-account.workers.dev" style="max-width:none"><button class="btn primary" id="saveWorkerApi">Connect API</button><button class="btn" id="testWorkerApi">Test</button></div>
+        <div class="small muted" id="workerApiHint">Without a Worker URL, company discovery uses Wikidata and domain checks run through public DNS-over-HTTPS. MCA dataset lookups require the Worker plus a free data.gov.in API key.</div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <div class="eyebrow">01 · Company identity</div><h3 style="margin-top:5px">Search by company or registration ID</h3>
+          <p class="small">Search legal names, CIN, LLPIN, GSTIN, website or email domain.</p>
+          <div class="field" style="margin-top:15px"><label for="advancedQuery">Company name / CIN / LLPIN / GSTIN / domain</label><input id="advancedQuery" placeholder="e.g. Infosys Limited or CIN U72900KA2018PTC114387"></div>
+          <div class="form-actions"><button class="btn primary" id="advancedSearchBtn">Search intelligence sources →</button><button class="btn" id="advancedClearBtn">Clear</button></div>
+          <div id="advancedSearchResult" style="margin-top:17px"><div class="empty"><b>Start with any company identifier</b>Official registry data is distinguished from community discovery results.</div></div>
+        </div>
+        <div class="card">
+          <div class="eyebrow">02 · Domain & email security</div><h3 style="margin-top:5px">Investigate a domain</h3>
+          <p class="small">Check DNS configuration, mail routing, SPF, DMARC and publicly available RDAP registration details.</p>
+          <div class="field" style="margin-top:15px"><label for="advancedDomain">Website domain or sender email</label><input id="advancedDomain" placeholder="recruiter@company.in"></div>
+          <button class="btn primary" id="domainCheckBtn">Run domain checks →</button>
+          <div id="domainResult" style="margin-top:15px"><div class="note">A valid DNS setup does not prove that a company owns the domain or that a particular recruiter is authorised.</div></div>
+        </div>
+      </div>
+
+      <div class="grid two" style="margin-top:16px">
+        <div class="card">
+          <div class="eyebrow">03 · Original email investigation</div><h3 style="margin-top:5px">Analyse raw email headers</h3>
+          <p class="small">Paste the original raw headers from your mailbox to inspect From, Reply-To, Return-Path and reported SPF/DKIM/DMARC results.</p>
+          <div class="field" style="margin-top:15px"><label for="rawEmailHeaders">Raw email headers</label><textarea id="rawEmailHeaders" style="min-height:145px" placeholder="From: Recruiter <person@company.com>&#10;Reply-To: ...&#10;Authentication-Results: ...&#10;Received: ..."></textarea></div>
+          <button class="btn primary" id="headerCheckBtn">Analyse headers →</button>
+          <div id="headerResult" style="margin-top:15px"></div>
+        </div>
+        <div class="card">
+          <div class="eyebrow">04 · Recruiter & contact cross-check</div><h3 style="margin-top:5px">Investigate a claimed recruiter</h3>
+          <p class="small">Build independent search paths for a recruiter's public professional footprint. This does not scrape private profiles or assume employment from a profile match.</p>
+          <div class="field" style="margin-top:15px"><label for="recruiterName">Recruiter name</label><input id="recruiterName" placeholder="Name stated in the offer"></div>
+          <div class="form-row">
+            <div class="field"><label for="recruiterCompany">Claimed company</label><input id="recruiterCompany" placeholder="Company name"></div>
+            <div class="field"><label for="recruiterEmail">Claimed email (optional)</label><input id="recruiterEmail" placeholder="name@company.com"></div>
+          </div>
+          <button class="btn primary" id="recruiterCheckBtn">Build public cross-checks →</button>
+          <div id="recruiterResult" style="margin-top:15px"></div>
+        </div>
+      </div>
+
+      <div class="note" style="margin-top:17px"><strong>Evidence boundary:</strong> OGD company master data is a periodic government-published snapshot, not a live MCA transaction. DNS, RDAP, SPF, DKIM and DMARC are technical signals; they do not validate job offers. LinkedIn and job portals are linked for manual review; restricted profiles are not scraped. GST and Udyam verification remain manual official-portal checks in this release.</div>
     </section>
 
     <section class="page" id="page-companies">
@@ -177,7 +228,7 @@ async function api(path,opts={}){
  if(path.startsWith("/api/reports/")&&method==="DELETE"){const id=path.split("/").pop(),rows=staticReports(),next=rows.filter(r=>r.id!==id);storeStaticReports(next);return {deleted:next.length<rows.length}}
  throw new Error("This feature is not available in the static GitHub Pages edition.");
 }
-function go(page){$$(".page").forEach(p=>p.classList.remove("active"));const el=$("#page-"+page);if(el)el.classList.add("active");$$(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("#crumb").textContent=({overview:"Overview",companies:"Company intelligence","company-detail":"Company profile",investigate:"Investigate an offer",reports:"Saved investigations","report-detail":"Investigation report",sources:"Source directory",approach:"How evidence works"})[page]||page;$("#sidebar").classList.remove("open");if(page==="reports")loadReports();if(page==="sources")renderSources();if(page==="companies")renderCompanies(companies);window.scrollTo({top:0,behavior:"smooth"})}
+function go(page){$(".page").forEach(p=>p.classList.remove("active"));const el=$("#page-"+page);if(el)el.classList.add("active");$(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("#crumb").textContent=({overview:"Overview",advanced:"Advanced search & intelligence",companies:"Company intelligence","company-detail":"Company profile",investigate:"Investigate an offer",reports:"Saved investigations","report-detail":"Investigation report",sources:"Source directory",approach:"How evidence works"})[page]||page;$("#sidebar").classList.remove("open");if(page==="reports")loadReports();if(page==="sources")renderSources();if(page==="companies")renderCompanies(companies);if(page==="advanced")refreshWorkerStatus();window.scrollTo({top:0,behavior:"smooth"})}
 function initials(n){return String(n||"OS").split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()}
 function companyCard(c){const tag=c.isManual?'Manual investigation · not verified':c.isExternal?'Open-data candidate · not verified':'Official-source reference';const klass=c.isManual||c.isExternal?'demo':'official';return '<article class="company-card" data-company="'+esc(c.id)+'"><div class="co-logo">'+esc(initials(c.name))+'</div><div style="min-width:0;flex:1"><h3>'+esc(c.name)+'</h3><p>'+esc(c.sector||"Company reference")+'</p><div class="quick"><span class="tag '+klass+'">'+tag+'</span></div></div><span style="color:#9aa5b7">↗</span></article>'}
 async function init(){try{const [c,s,r]=await Promise.all([api("/api/companies"),api("/api/sources"),api("/api/reports")]);companies=c.companies;sources=s.sources;$("#statCompanies").textContent=companies.length;$("#statSources").textContent=sources.length;$("#statReports").textContent=r.reports.length;$("#homeCompanies").innerHTML=companies.slice(0,4).map(companyCard).join("");$("#companiesGrid").innerHTML=companies.map(companyCard).join("");$("#investigateCompany").innerHTML='<option value="">Choose a company (optional)</option>'+companies.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join("");renderSources();}catch(e){toast(e.message)}}
@@ -219,6 +270,12 @@ function manualSearchLinks(c){
  ];
 }
 async function showExternalCompany(c){
+ if(c.isRegistry){
+  go("company-detail");$("#detailTitle").textContent=c.name;$("#detailSubtitle").textContent="MCA company master-data snapshot · "+c.evidenceStatus;
+  const rows=[["CIN / LLPIN",c.identifier||"Not available"],["Company status",c.status||"Not supplied"],["Company class",c.class||"Not supplied"],["Category",c.category||"Not supplied"],["Sub-category",c.subCategory||"Not supplied"],["Registration date",c.registrationDate||"Not supplied"],["Registered state",c.state||"Not supplied"],["Registrar of Companies",c.roc||"Not supplied"],["Authorised capital",c.authorizedCapital||"Not supplied"],["Paid-up capital",c.paidUpCapital||"Not supplied"],["Registered office",c.registeredOffice||"Not supplied"],["Listing status",c.listingStatus||"Not supplied"],["Industrial classification",c.industrialClassification||"Not supplied"]];
+  $("#companyDetail").innerHTML='<div class="company-layout"><div class="card"><div class="company-hero"><div class="co-logo">'+esc(initials(c.name))+'</div><div><h2>'+esc(c.name)+'</h2><p>Legal identity from MCA dataset · '+esc(c.identifier||"")+'</p><span class="tag official">Official government dataset record</span></div></div><div class="detail-list">'+rows.map(x=>'<div class="detail-row"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join("")+'</div><div class="note" style="margin-top:15px">'+esc(c.evidenceNote||"Periodic government-published company master-data record. It is not a real-time MCA status check.")+'</div><div class="quick"><a class="btn" href="https://www.mcacdm.nic.in/company-master-details" target="_blank" rel="noopener noreferrer">Recheck on MCA ↗</a><a class="btn" href="https://www.data.gov.in/catalog/company-master-data" target="_blank" rel="noopener noreferrer">Dataset source ↗</a></div></div><div class="card"><h3>Recruitment intelligence</h3><p class="small">Legal registration does not authenticate a recruiter or vacancy.</p><div class="detail-list"><div class="detail-row"><span>Published hiring process</span><b>Not yet sourced</b></div><div class="detail-row"><span>Recruitment contacts</span><b>Not yet sourced</b></div><div class="detail-row"><span>Official website</span><b>Not present in this dataset</b></div><div class="detail-row"><span>GST / Udyam / EPFO</span><b>Separate checks required</b></div></div><div class="note" style="margin-top:14px">Use the manual verification links to confirm other legal/business registrations. Never treat missing fields in this dataset as evidence of fraud.</div><div class="quick"><button class="btn primary" id="investigateThisCompany">Investigate an offer →</button></div></div></div>';
+  const option={...c,id:c.id};dynamicCompanies.set(c.id,option);addCompanyToInvestigation(option);$("#investigateThisCompany").onclick=()=>{addCompanyToInvestigation(option);go("investigate")};return;
+ }
  go("company-detail");$("#detailTitle").textContent=c.name;$("#detailSubtitle").textContent=c.isManual?"Manual investigation · no identity match yet":"Open-data candidate · not official registry verification";
  $("#companyDetail").innerHTML='<div class="loading">Loading public open-data details…</div>';
  if(!c.isManual)await hydrateWikidataCompany(c);
@@ -235,6 +292,118 @@ async function showExternalCompany(c){
 }
 function openManualCompanyFromSearch(query){const c=createManualCompany(query);showExternalCompany(c)}
 
+
+// Advanced company intelligence: Worker API when connected, browser-safe fallbacks otherwise.
+function workerApiBase(){return (localStorage.getItem("offershield_worker_api")||"").replace(/\/+$/,"")}
+function refreshWorkerStatus(){
+ const base=workerApiBase();$("#workerApiUrl").value=base;
+ $("#workerStatus").textContent=base?"Worker API configured":"Browser fallback";
+ $("#workerStatus").className="tag "+(base?"official":"demo");
+ $("#workerApiHint").textContent=base?"The site will use your configured Cloudflare Worker. The Worker URL contains no secret. Test the connection before relying on live registry queries.":"No Worker is connected. Wikidata discovery and browser DNS checks remain available; official OGD lookup requires a server-side data.gov.in key.";
+}
+async function workerRequest(path,options={}){
+ const base=workerApiBase();if(!base)throw new Error("Connect your Cloudflare Worker URL first.");
+ const response=await fetch(base+path,{...options,headers:{"content-type":"application/json",...(options.headers||{})}});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(data.error?.message||"Intelligence API request failed.");
+ return data;
+}
+function registryCandidate(record){
+ const id="ogd-"+String(record.identifier||Math.random().toString(36).slice(2));
+ const profile={id,name:record.name||record.identifier,legalName:record.name||"Not available",identifier:record.identifier,entityType:record.class||"MCA company master-data record",sector:record.industrialClassification||"MCA company master data",status:record.status, class:record.class,category:record.category,subCategory:record.subCategory,registrationDate:record.registrationDate,state:record.state,roc:record.roc,authorizedCapital:record.authorizedCapital,paidUpCapital:record.paidUpCapital,registeredOffice:record.registeredOffice,listingStatus:record.listingStatus,industrialClassification:record.industrialClassification,evidenceStatus:record.evidenceStatus||"official_dataset_record",evidenceNote:record.evidenceNote,sourceUrl:record.source?.url||"https://www.data.gov.in/catalog/company-master-data",isRegistry:true,isExternal:true,domains:[],contacts:[],policies:[],website:"",careers:"",linkedin:""};
+ dynamicCompanies.set(id,profile);return profile;
+}
+function candidateFromWikidata(item){
+ const id="wd-"+(item.id||Math.random().toString(36).slice(2));
+ const profile={id,name:item.name||item.label||"Company candidate",legalName:"Not established from this source",entityType:"Open-data discovery candidate",website:"",careers:"",linkedin:"",domains:[],sector:item.description||"Community-maintained public knowledge entry",label:"Wikidata result — not registry verified",summary:item.description||"Community-maintained public knowledge entry.",contacts:[],policies:[],isExternal:true,isManual:false,wikidataId:item.id,wikidataUrl:item.entityUrl||"https://www.wikidata.org/wiki/"+encodeURIComponent(item.id||"")};
+ dynamicCompanies.set(id,profile);return profile;
+}
+function renderAdvancedResults(data,query){
+ const official=(data.registry||[]).map(registryCandidate);
+ const discovery=(data.discovery||[]).map(candidateFromWikidata);
+ const results=[...official,...discovery];
+ const message=official.length?'<div class="note"><strong>Official dataset match:</strong> The following records came from the MCA company master-data resource distributed through data.gov.in. This is a periodic snapshot, not a live MCA portal query.</div>':data.registryConfigured===false?'<div class="note">Official MCA dataset API is not configured on the Worker yet. Connect the backend and add a free data.gov.in key as a Worker secret to enable registry lookups.</div>':"";
+ const cards=results.map(c=>'<article class="company-card" data-company="'+esc(c.id)+'"><div class="co-logo">'+esc(initials(c.name))+'</div><div style="min-width:0;flex:1"><h3>'+esc(c.name)+'</h3><p>'+esc(c.identifier||c.sector||"Discovery candidate")+' · '+esc(c.status||c.evidenceStatus||"Not verified")+'</p><div class="quick"><span class="tag '+(c.isRegistry?"official":"demo")+'">'+(c.isRegistry?"MCA dataset record":"Third-party discovery candidate")+'</span></div></div><span style="color:#9aa5b7">↗</span></article>').join("");
+ const manual='<div class="note" style="margin-top:11px">No result is not proof that a business is fake. Search the legal name, CIN or LLPIN in the official MCA portal and consider brand/subsidiary relationships.</div><div class="quick"><button class="btn" data-manual-company="'+esc(query)+'">Start manual company investigation</button><a class="btn" target="_blank" rel="noopener noreferrer" href="https://www.mcacdm.nic.in/company-master-details">Open MCA lookup ↗</a><a class="btn" target="_blank" rel="noopener noreferrer" href="https://www.data.gov.in/catalog/company-master-data">Open MCA dataset ↗</a></div>";
+ $("#advancedSearchResult").innerHTML=message+(cards?'<div class="company-grid" style="margin-top:12px">'+cards+'</div>':'<div class="empty"><b>No structured company match returned</b>Try a different legal name or an exact CIN/LLPIN.</div>')+manual+(data.registryError?'<div class="note" style="margin-top:10px">Registry connector note: '+esc(data.registryError.message||data.registryError.code)+'</div>':'');
+}
+async function runAdvancedSearch(){
+ const query=$("#advancedQuery").value.trim();if(query.length<2){toast("Enter a company name or identifier.");return}
+ const button=$("#advancedSearchBtn");button.disabled=true;button.textContent="Searching sources…";
+ $("#advancedSearchResult").innerHTML='<div class="loading">Checking registry and discovery sources…</div>';
+ try{
+  let data;
+  if(workerApiBase()){
+   data=await workerRequest("/v1/search?q="+encodeURIComponent(query));
+  }else{
+   const matchCIN=/^[LU][A-Z0-9]{20}$/i.test(query),matchLLP=/^[A-Z]{3}-\d{4}$/i.test(query),matchGST=/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/i.test(query);
+   if(matchCIN||matchLLP||matchGST){
+    data={query,registry:[],registryConfigured:false,discovery:[],registryError:{message:"Connect the Cloudflare Worker and configure DATA_GOV_API_KEY for automated MCA dataset lookup. GST remains an official manual verification workflow."}};
+   }else{
+    const matches=await searchOpenDataCompanies(query);
+    data={query,registry:[],registryConfigured:false,discovery:[...dynamicCompanies.values()].filter(x=>x.wikidataId).map(x=>({id:x.wikidataId,name:x.name,description:x.sector,entityUrl:x.wikidataUrl})).slice(0,8)};
+   }
+  }
+  renderAdvancedResults(data,query);
+ }catch(error){$("#advancedSearchResult").innerHTML='<div class="note">Search could not complete: '+esc(error.message)+'. You can still open the official MCA lookup or create a manual investigation.</div><button class="btn" data-manual-company="'+esc(query)+'">Investigate manually</button>'}
+ finally{button.disabled=false;button.textContent="Search intelligence sources →"}
+}
+async function checkDomainBrowser(domainValue){
+ const raw=String(domainValue||"").trim(),domain=raw.includes("@")?raw.slice(raw.lastIndexOf("@")+1):raw.replace(/^https?:\/\//i,"").split(/[/?#]/)[0].replace(/^www\./i,"");
+ if(!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(domain))throw new Error("Enter a valid public domain or email address.");
+ const get=async(name,type)=>{const url="https://dns.google/resolve?"+new URLSearchParams({name,type,ct:"application/dns-json"});const res=await fetch(url,{headers:{Accept:"application/dns-json"}});if(!res.ok)throw new Error("Public DNS query unavailable");const data=await res.json();return {name,type,status:data.Status===0?(data.Answer?.length?"found":"no_record"):"dns_error",answers:(data.Answer||[]).map(x=>x.data)}};
+ const records=await Promise.all([get(domain,"A"),get(domain,"AAAA"),get(domain,"MX"),get(domain,"TXT"),get("_dmarc."+domain,"TXT"),get(domain,"NS")]);
+ const txt=records.find(x=>x.type==="TXT")?.answers||[],spf=txt.find(x=>/^"?v=spf1/i.test(x));
+ const dmarc=records.find(x=>x.name==="_dmarc."+domain)?.answers?.find(x=>/v=DMARC1/i.test(x));
+ let rdap=null;try{const res=await fetch("https://rdap.org/domain/"+encodeURIComponent(domain),{headers:{Accept:"application/rdap+json,application/json"}});if(res.ok){const d=await res.json();rdap={name:d.ldhName||domain,status:d.status||[],events:(d.events||[]).filter(x=>["registration","expiration","last changed"].includes(x.eventAction)).map(x=>({action:x.eventAction,date:x.eventDate}))}}}catch{}
+ return {domain,dns:records,emailSecurity:{mxPresent:records.find(x=>x.type==="MX")?.answers?.length>0,spfPresent:!!spf,spfRecord:spf||null,dmarcPresent:!!dmarc,dmarcRecord:dmarc||null,dkim:"Requires original email header selector"},registration:rdap,checkedAt:new Date().toISOString(),limitations:["DNS records describe technical configuration; they do not prove the domain belongs to a claimed company.","Missing SPF, DMARC or MX records are not proof of fraud.","This scan does not inspect sender mailbox ownership or fetch the submitted website."]};
+}
+function renderDomainReport(data){
+ const dns=data.dns||[],email=data.emailSecurity||{},registration=data.registration||null;
+ const recordRows=dns.map(x=>'<div class="detail-row"><span>'+esc(x.type)+' · '+esc(x.name)+'</span><b style="max-width:62%;overflow-wrap:anywhere">'+esc((x.answers||[]).join(" · ")||x.status)+'</b></div>').join("");
+ const statusRows=[["MX record",email.mxPresent],["SPF record",email.spfPresent],["DMARC record",email.dmarcPresent]].map(x=>'<div class="detail-row"><span>'+esc(x[0])+'</span><b>'+ (x[1]?'<span class="tag official">Found</span>':'<span class="tag demo">Not found / unknown</span>')+'</b></div>').join("");
+ const events=(registration?.events||[]).map(x=>'<div class="detail-row"><span>'+esc(x.action)+'</span><b>'+esc(x.date)+'</b></div>').join("");
+ $("#domainResult").innerHTML='<div class="card"><div class="result-head"><div><h3>'+esc(data.domain)+'</h3><p class="small">Technical domain observations · '+esc(new Date(data.checkedAt||Date.now()).toLocaleString())+'</p></div><span class="tag">No authenticity verdict</span></div><div class="section-title"><h2>DNS records</h2></div><div class="detail-list">'+recordRows+'</div><div class="section-title"><h2>Email security signals</h2></div><div class="detail-list">'+statusRows+'</div>'+(email.spfRecord?'<div class="note">SPF: '+esc(email.spfRecord)+'</div>':'')+(email.dmarcRecord?'<div class="note" style="margin-top:7px">DMARC: '+esc(email.dmarcRecord)+'</div>':'')+'<div class="section-title"><h2>Public domain registration (RDAP)</h2></div><div class="detail-list">'+(registration?'<div class="detail-row"><span>RDAP name</span><b>'+esc(registration.ldhName||registration.name||data.domain)+'</b></div>'+events:'<div class="note">RDAP data unavailable for this lookup.</div>')+'</div><div class="note" style="margin-top:15px">'+(data.limitations||[]).map(esc).join("<br>")+'</div></div>';
+}
+async function runDomainCheck(){
+ const raw=$("#advancedDomain").value.trim();if(!raw){toast("Enter a website domain or email address.");return}
+ $("#domainResult").innerHTML='<div class="loading">Checking public DNS and RDAP records…</div>';
+ try{const data=workerApiBase()?await workerRequest("/v1/domain/"+encodeURIComponent(raw)):await checkDomainBrowser(raw);renderDomainReport(data)}
+ catch(error){$("#domainResult").innerHTML='<div class="note">Domain check failed: '+esc(error.message)+'</div>'}
+}
+function parseHeadersInBrowser(raw){
+ const text=String(raw||"").replace(/\r?\n[ \t]+/g," ");
+ const get=name=>text.match(new RegExp("^"+name+":\\s*(.+)$","im"))?.[1]?.trim()||"Not found";
+ const auth=[...text.matchAll(/^Authentication-Results:\s*(.+)$/gim)].map(x=>x[1]).join("; ");
+ const check=name=>auth.match(new RegExp("(?:^|[;\\s])"+name+"=([a-z]+)","i"))?.[1]||"Not reported";
+ const from=get("From"),reply=get("Reply-To"),ret=get("Return-Path");
+ return {from,reply,returnPath:ret,spf:check("spf"),dkim:check("dkim"),dmarc:check("dmarc"),replyMismatch:reply!=="Not found"&&!reply.toLowerCase().includes(from.split("@").pop()?.replace(/[>\\s].*$/,"").toLowerCase()||"__none__")};
+}
+async function runHeaderCheck(){
+ const raw=$("#rawEmailHeaders").value.trim();if(raw.length<20){toast("Paste the original raw email headers.");return}
+ let data;
+ try{data=workerApiBase()?await workerRequest("/v1/email/headers",{method:"POST",body:JSON.stringify({headers:raw,expectedDomains:[]})}):parseHeadersInBrowser(raw)}
+ catch(error){data=parseHeadersInBrowser(raw);data.workerNote=error.message}
+ const values=[["From",data.from],["Reply-To",data.replyTo||data.reply],["Return-Path",data.returnPath],["SPF",data.spf],["DKIM",data.dkim],["DMARC",data.dmarc]];
+ $("#headerResult").innerHTML='<div class="detail-list">'+values.map(x=>'<div class="detail-row"><span>'+esc(x[0])+'</span><b>'+esc(x[1]||"Not reported")+'</b></div>').join("")+'</div><div class="note" style="margin-top:10px">Header text can be edited before pasting. Check the original raw headers from the mailbox. SPF/DKIM/DMARC results do not prove that the named recruiter works for the company or that the offer is authorised.</div>'+(data.replyMismatch?'<div class="note" style="margin-top:8px">Reply-To differs from the parsed sender domain. Investigate the discrepancy; this alone does not prove fraud.</div>':"")+(data.workerNote?'<div class="small muted">'+esc(data.workerNote)+'</div>':"");
+}
+function buildRecruiterChecks(){
+ const name=$("#recruiterName").value.trim(),company=$("#recruiterCompany").value.trim(),email=$("#recruiterEmail").value.trim();if(!name||!company){toast("Enter the recruiter name and claimed company.");return}
+ const q=encodeURIComponent('"'+name+'" "'+company+'"');
+ const links=[["LinkedIn people search","https://www.linkedin.com/search/results/people/?keywords="+encodeURIComponent(name+" "+company)],["Company website search","https://www.google.com/search?q="+q+"+site%3A"+encodeURIComponent(company.toLowerCase().replace(/[^a-z0-9]+/g,"")+".com")],["Public web search","https://www.google.com/search?q="+q],["LinkedIn company search","https://www.linkedin.com/search/results/companies/?keywords="+encodeURIComponent(company)]];
+ let domain=email.includes("@")?email.split("@").pop().toLowerCase():"";
+ $("#recruiterResult").innerHTML='<div class="note"><strong>Candidate-provided identity:</strong> '+esc(name)+' · '+esc(company)+(email?' · '+esc(email):'')+'. These are search routes, not verified employment records.</div>'+(domain?'<div class="detail-row"><span>Email domain</span><b>'+esc(domain)+'</b></div>':"")+'<div class="quick">'+links.map(x=>'<a class="btn" href="'+esc(x[1])+'" target="_blank" rel="noopener noreferrer">'+esc(x[0])+' ↗</a>').join("")+'</div><div class="note" style="margin-top:10px">Confirm the person's role through a separately sourced company switchboard or recruitment contact. A public profile or matching email domain is not proof of current employment or authority to issue the offer.</div>';
+}
+async function testWorkerConnection(){
+ if(!workerApiBase()){toast("Paste your Worker URL first.");return}
+ try{const data=await workerRequest("/v1/health");$("#workerStatus").textContent="Connected · "+(data.d1Configured?"D1 enabled":"D1 not configured");$("#workerStatus").className="tag official";$("#workerApiHint").textContent="MCA OGD key: "+(data.officialOgdConfigured?"configured":"not configured")+" · D1: "+(data.d1Configured?"connected":"not connected");toast("Worker API connection successful.")}catch(error){$("#workerStatus").textContent="Connection error";$("#workerStatus").className="tag warning";toast(error.message)}
+}
+function saveAdvancedReport(){
+ const content=$("#advancedSearchResult").innerText+"\n\n"+$("#domainResult").innerText+"\n\n"+$("#headerResult").innerText;
+ if(content.trim().length<30){toast("Run at least one advanced investigation first.");return}
+ const reports=staticReports();const report={id:"advanced-"+Date.now().toString(36),title:"Advanced intelligence investigation",companyId:null,companyName:$("#advancedQuery").value.trim(),fields:{emails:[],urls:[],domains:[],phones:[],cins:[],gstins:[],role:null,paymentSignals:[]},findings:[{state:"unknown",title:"Advanced investigation evidence",detail:content.slice(0,15000)}],summary:"A combined public-source investigation. Review each cited source independently.",status:"advanced_review",createdAt:new Date().toISOString()};storeStaticReports([report,...reports]);toast("Advanced investigation summary saved in this browser.");$("#statReports").textContent=staticReports().length;
+}
+
 function findingHTML(f){const glyph=f.state==="match"?"✓":f.state==="warning"?"!":"i";return '<div class="finding"><div class="finding-icon '+esc(f.state)+'">'+glyph+'</div><div><h4>'+esc(f.title)+'</h4><p>'+esc(f.detail)+'</p></div></div>'}
 function resultHTML(r){const c=r.company;return '<div class="card"><div class="result-head"><div><div class="eyebrow">Evidence review</div><h3>'+(c?esc(c.name):"Message analysis")+'</h3><p class="small muted" style="margin-top:5px">'+esc(r.summary)+'</p></div><span class="tag '+(r.findings.some(f=>f.state==="warning")?"demo":"")+'">'+(r.status==="company_only"?"Company information only":r.findings.some(f=>f.state==="warning")?"Review required":"Insufficient evidence")+'</span></div><div style="margin-top:14px">'+r.findings.map(findingHTML).join("")+'</div><div class="section-title"><h2>Extracted details</h2></div><div class="detail-list">'+[['Email addresses',r.fields.emails.join(", ")||"Not found"],['Website / URL domains',r.fields.domains.join(", ")||"Not found"],['Phone numbers',r.fields.phones.join(", ")||"Not found"],['Role clue',r.fields.role||"Not found"],['CIN patterns',r.fields.cins.join(", ")||"Not found"],['GSTIN patterns',r.fields.gstins.join(", ")||"Not found"],['Payment-related phrases',r.fields.paymentSignals.join(" · ")||"Not found"]].map(x=>'<div class="detail-row"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join("")+'</div><div class="note" style="margin-top:16px"><strong>Coverage limitation:</strong> This is a heuristic comparison of pasted text with the small company reference set. It cannot validate email headers, mailbox ownership, recruiter employment, vacancy approval, signatures or offer status. No numerical fraud probability is generated.</div><div class="quick"><button class="btn primary" id="saveReportBtn">Save investigation</button><button class="btn" id="printAnalysisBtn">Print / Save PDF</button></div></div>'}
 async function runAnalysis(){const text=$("#offerText").value.trim(),companyId=$("#investigateCompany").value;if(!text&&!companyId){toast("Paste a message or choose a company first.");return}const btn=$("#analyseBtn");btn.disabled=true;btn.textContent="Analysing…";try{lastInput=text;lastAnalysis=await api("/api/analyse",{method:"POST",body:JSON.stringify({text,companyId})});$("#analysisResult").classList.remove("hidden");$("#analysisResult").innerHTML=resultHTML(lastAnalysis);$("#saveReportBtn").onclick=saveReport;$("#printAnalysisBtn").onclick=()=>window.print();$("#analysisResult").scrollIntoView({behavior:"smooth",block:"start"})}catch(e){toast(e.message)}finally{btn.disabled=false;btn.textContent="Analyse evidence →"}}
@@ -246,6 +415,11 @@ $("#heroSearchBtn").onclick=()=>{$("#companySearch").value=$("#heroSearch").valu
 $("#heroSearch").addEventListener("keydown",e=>{if(e.key==="Enter")$("#heroSearchBtn").click()});
 $("#companySearchBtn").onclick=filterCompanies;$("#companySearch").addEventListener("input",filterCompanies);
 async function searchOpenDataCompanies(query){
+ if(workerApiBase()){
+  const data=await workerRequest("/v1/search?q="+encodeURIComponent(query));
+  const results=[...(data.registry||[]).map(registryCandidate),...(data.discovery||[]).map(candidateFromWikidata)];
+  return results;
+ }
  const endpoint="https://www.wikidata.org/w/api.php?action=wbsearchentities&search="+encodeURIComponent(query)+"&language=en&uselang=en&format=json&limit=8&origin=*";
  const response=await fetch(endpoint,{headers:{Accept:"application/json"}});
  if(!response.ok)throw new Error("Open-data search is temporarily unavailable.");
@@ -280,7 +454,7 @@ async function filterCompanies(){
   try{
    const results=await searchOpenDataCompanies(q);
    if(seq!==companySearchSequence)return;
-   renderCompanies(results,q,results.length?'These are open-data search results, not official company verification. Confirm the legal entity and current status with MCA/GST or the relevant regulator.':'No open-data match was returned. You can still continue with a manual investigation and official registry lookups.');
+   renderCompanies(results,q,results.some(x=>x.isRegistry)?'Official company master-data records appear first. Other matches are third-party discovery candidates. Verify the current legal status independently.':'These are open-data discovery candidates, not official company verification. Confirm the legal entity and current status with MCA/GST or the relevant regulator.');
   }catch(error){
    if(seq!==companySearchSequence)return;
    renderCompanies([],q,'Live open-data search could not be reached from this browser. You can still continue with a manual investigation using official registry links.');
@@ -295,6 +469,16 @@ $("#mobileMenu").onclick=()=>$("#sidebar").classList.toggle("open");
 $$(".nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.page)));
 $$("[data-goto]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.goto)));
 document.addEventListener("click",e=>{const m=e.target.closest("[data-manual-company]");if(m){openManualCompanyFromSearch(m.dataset.manualCompany);return}const c=e.target.closest("[data-company]");if(c)showCompany(c.dataset.company);const r=e.target.closest("[data-report]");if(r)openReport(r.dataset.report);const d=e.target.closest("[data-delete]");if(d)removeReport(d.dataset.delete)});
+$("#saveWorkerApi").onclick=()=>{const value=$("#workerApiUrl").value.trim().replace(/\/+$/,"");if(value&&!/^https:\/\//i.test(value)){toast("Use the HTTPS Worker URL.");return}if(value)localStorage.setItem("offershield_worker_api",value);else localStorage.removeItem("offershield_worker_api");refreshWorkerStatus();toast("API endpoint setting saved in this browser.")};
+$("#testWorkerApi").onclick=testWorkerConnection;
+$("#advancedSearchBtn").onclick=runAdvancedSearch;
+$("#advancedQuery").addEventListener("keydown",e=>{if(e.key==="Enter")runAdvancedSearch()});
+$("#advancedClearBtn").onclick=()=>{$("#advancedQuery").value="";$("#advancedSearchResult").innerHTML='<div class="empty"><b>Start with any company identifier</b>Official registry data is distinguished from community discovery results.</div>'};
+$("#domainCheckBtn").onclick=runDomainCheck;
+$("#advancedDomain").addEventListener("keydown",e=>{if(e.key==="Enter")runDomainCheck()});
+$("#headerCheckBtn").onclick=runHeaderCheck;
+$("#recruiterCheckBtn").onclick=buildRecruiterChecks;
+const advancedNav=document.createElement("button");advancedNav.className="btn";advancedNav.textContent="Advanced investigation →";advancedNav.dataset.goto="advanced";$("#homeCompanies").parentElement.insertAdjacentElement("afterend",advancedNav);
 init();
 </script>
 </body></html>
