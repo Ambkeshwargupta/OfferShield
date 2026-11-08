@@ -60,3 +60,18 @@ test("does not send an LLPIN into the CIN-only MCA OGD filter", async()=>{
   assert.equal(body.registryConfigured,false);
   assert.ok(body.notes[0].includes("not incorrectly sent as a CIN filter"));
 });
+
+test("scheduled cleanup removes expired cache, observations and old rate buckets", async()=>{
+  const queries=[];
+  const db={
+    prepare(sql){return {sql,bind(...values){return {sql,values,run:async()=>{queries.push({sql,values});return {success:true}}}}}},
+    batch:async statements=>{queries.push(...statements.map(s=>({sql:s.sql,values:s.values})));return {success:true}}
+  };
+  const ctx={waitUntil(promise){this.promise=promise}};
+  await worker.scheduled({cron:"15 3 * * *"},env({DB:db}),ctx);
+  await ctx.promise;
+  assert.equal(queries.length,3);
+  assert.ok(queries.some(q=>q.sql.includes("DELETE FROM api_cache")));
+  assert.ok(queries.some(q=>q.sql.includes("DELETE FROM company_observations")));
+  assert.ok(queries.some(q=>q.sql.includes("DELETE FROM rate_limits")));
+});
