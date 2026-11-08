@@ -65,6 +65,28 @@ async function cachedPut(env, key, payload, ttl = DEFAULT_TTL) {
   await env.DB.prepare("INSERT INTO api_cache (cache_key,payload,expires_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(cache_key) DO UPDATE SET payload=excluded.payload, expires_at=excluded.expires_at, updated_at=excluded.updated_at")
     .bind(key, JSON.stringify(payload), Date.now() + ttl * 1000, Date.now()).run();
 }
+async function persistCompanyObservations(env, records, sourceUpdatedAt = null) {
+  if (!env.DB || !records.length) return;
+  const now = new Date().toISOString();
+  const statements = [];
+  const claims = ["name","status","class","category","subCategory","registrationDate","state","roc","authorizedCapital","paidUpCapital","registeredOffice","listingStatus","industrialClassification"];
+  for (const record of records) {
+    if (!record.identifier) continue;
+    for (const claim of claims) {
+      const value = record[claim];
+      if (value === null || value === undefined || value === "") continue;
+      statements.push(env.DB.prepare(
+        "INSERT OR IGNORE INTO company_observations (entity_identifier,source_id,claim_type,claim_value,evidence_status,source_url,source_updated_at,retrieved_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?)"
+      ).bind(
+        String(record.identifier), "mca-ogd", claim, String(value),
+        "official_dataset_record", "https://www.data.gov.in/catalog/company-master-data",
+        sourceUpdatedAt, now, Date.now() + DEFAULT_TTL * 1000
+      ));
+    }
+  }
+  if (statements.length) await env.DB.batch(statements);
+}
+
 async function ogdLookup(env, field, value, limit = 10) {
   if (!env.DATA_GOV_API_KEY) return { configured: false, records: [], message: "Configure DATA_GOV_API_KEY as a Cloudflare Worker secret to enable official OGD company-data lookup." };
   const safeField = field === "CIN" ? "CIN" : field === "CompanyName" ? "CompanyName" : null;
@@ -93,6 +115,7 @@ async function ogdLookup(env, field, value, limit = 10) {
     const payload = await upstream.json();
     const rows = (payload.records || payload.data || []).map(normalizeOgdRecord).filter(x => x.identifier || x.name);
     await cachedPut(env, cacheKey, rows);
+    await persistCompanyObservations(env, rows, payload.updated_date || null);
     return { configured: true, records: rows, source: "data.gov.in", sourceUrl: "https://www.data.gov.in/catalog/company-master-data", updatedDate: payload.updated_date || null, total: Number(payload.total || rows.length) };
   } catch (error) {
     return { configured: true, records: [], error: { code: "ogd_unavailable", message: error.name === "AbortError" ? "The OGD API request timed out." : "The OGD API could not be reached." } };
@@ -228,6 +251,13 @@ async function route(request, env) {
     if (!["CIN","LLPIN"].includes(parsed.type)) return jsonError("Enter a valid CIN or LLPIN.",400,origin,"invalid_identifier");
     const ogd = await ogdLookup(env,"CIN",parsed.value,5);
     return response({ query:parsed.value, records:ogd.records.map(r=>companyResponse(r)), configured:ogd.configured, error:ogd.error||null, sourceUrl:"https://www.data.gov.in/catalog/company-master-data", manualLookup:"https://www.mcacdm.nic.in/company-master-details" },200,origin);
+  }
+  if (request.method === "GET" && url.pathname === "/v1/contacts") {
+    const domain = validPublicDomain(url.searchParams.get("domain") || "");
+    if (!domain) return jsonError("Enter a valid company email or website domain.",400,origin,"invalid_domain");
+    if (!env.DB) return response({ domain, contacts:[], configured:false, note:"Contact directory requires the D1 source database. Use the company's own website/contact page as the independent verification channel." },200,origin);
+    const rows = await env.DB.prepare("SELECT contact_type, contact_value, source_url, source_publisher, evidence_status, last_checked_at FROM public_contacts WHERE entity_identifier=? AND active=1 ORDER BY contact_type").bind(domain).all();
+    return response({ domain, contacts:rows.results||[], configured:true, note:"These contacts are shown only when they have been entered into the source registry from a company-published page. Reopen the source to confirm the current details." },200,origin);
   }
   if (request.method === "GET" && url.pathname.startsWith("/v1/domain/")) {
     const value=decodeURIComponent(url.pathname.slice("/v1/domain/".length));
