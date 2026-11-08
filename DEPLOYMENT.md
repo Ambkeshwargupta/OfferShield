@@ -1,39 +1,52 @@
-# Deployment notes
+# Deployment options
 
-OfferShield is a single-origin Node.js application with a static frontend and JSON-backed API. It does not need a build step or runtime package installation beyond Node itself.
+OfferShield has a static website and a separate intelligence API.
 
-## Requirements
+## A. Public website — GitHub Pages
 
-- Node.js 20+
-- A host that can run a long-lived Node HTTP process
-- Writable persistent storage for `DATA_DIR` if saved investigations must survive restarts
+The public frontend is under `docs/` and is published at:
 
-## Generic Node deployment
+https://ambkeshwargupta.github.io/OfferShield/
 
-1. Connect this repository to a Node-compatible hosting provider.
-2. Set the build command to empty / not required.
-3. Set the start command to `npm start`.
-4. Set `NODE_ENV=production`.
-5. Set `DATA_DIR` to the provider's persistent writable volume path.
-6. Ensure the service is configured to pass its assigned `PORT` environment variable.
-7. Visit `/api/health` after deployment.
+GitHub Pages serves static files only. It cannot execute `server.js`, host API keys or provide central database persistence. The site uses browser-side fallbacks until a Worker API is connected.
 
-The app binds to `0.0.0.0` and uses `process.env.PORT`.
+## B. Scalable API — Cloudflare Workers + D1
 
-## Docker
+See [workers/README.md](workers/README.md).
 
-Build:
+1. Create a Cloudflare account.
+2. Install Wrangler and run `wrangler login`.
+3. Create D1 database and apply `workers/schema.sql`.
+4. Add the D1 binding in `workers/wrangler.toml`.
+5. Store `DATA_GOV_API_KEY` as a Worker secret.
+6. Deploy the Worker.
+7. Copy the Worker URL into OfferShield → Advanced Search & Intelligence → API connection.
+8. Test the API status badge and run a CIN lookup, domain scan and header parse.
+
+The MCA OGD connector is available only when a data.gov.in key is configured. GST/Udyam remain official manual verification flows. D1 caching/rate limiting require the D1 binding.
+
+## C. Local Node prototype
+
+Requirements: Node.js 20+.
 
 ```bash
-docker build -t offershield .
+npm run check
+npm test
+npm start
 ```
 
-Run with persistent local storage:
+Open http://localhost:3000.
 
-```bash
-docker run --rm -p 3000:3000 -v offershield-data:/app/.data offershield
-```
+The Node prototype uses a JSON file and browser-session ownership. It is development/single-instance only, not the scalable production backend.
 
-## Important
+## Production requirements still not supplied by GitHub Pages
 
-Do not deploy with an ephemeral filesystem if users expect reports to persist. The current prototype uses a JSON file and a browser-session cookie, and is intended for a single application instance. It is not production-grade multi-user authentication or multi-instance data storage. Upgrade to a managed database, per-user accounts, stronger session management, monitoring, backups and a privacy review before a broad public launch.
+- Real user accounts and per-user report storage.
+- Custom authentication and access control for saved reports.
+- A managed multi-user report database.
+- Monitoring, alerting, backup and restore.
+- Formal source-refresh jobs and source quality review.
+- A data.gov.in account/API key supplied by the owner.
+- Cloudflare D1 database ID and Worker deployment URL supplied by the owner.
+
+The repository includes code and instructions for the Worker/D1 setup, but cannot create resources in your Cloudflare account without your login and explicit setup.
