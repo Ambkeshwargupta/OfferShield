@@ -31,3 +31,15 @@ test("reports capabilities and manual fallbacks", async()=>{
   assert.ok(body.capabilities.some(x=>x.id==="mca_ogd"));
   assert.ok(body.limitations.some(x=>x.includes("LinkedIn")));
 });
+
+test("blocks unapproved browser origins", async()=>{
+  const request=new Request("https://api.example.workers.dev/v1/health",{headers:{Origin:"https://untrusted.example"}});
+  const response=await worker.fetch(request,env(),ctx);
+  assert.equal(response.status,403);
+});
+
+test("allows the OfferShield Pages origin", async()=>{
+  const request=new Request("https://api.example.workers.dev/v1/health",{headers:{Origin:"https://ambkeshwargupta.github.io"}});
+  const response=await worker.fetch(request,env(),ctx);
+  assert.equal(response.status,200);
+});
