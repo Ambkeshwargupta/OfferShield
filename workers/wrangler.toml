@@ -5,7 +5,7 @@ workers_dev = true
 
 [vars]
 APP_NAME = "OfferShield Intelligence API"
-ALLOWED_ORIGIN = "https://ambkeshwargupta.github.io"
+ALLOWED_ORIGINS = "https://ambkeshwargupta.github.io,http://localhost:3000,http://127.0.0.1:3000"
 
 # Create a D1 database, then replace the placeholder database_id and uncomment:
 # [[d1_databases]]
