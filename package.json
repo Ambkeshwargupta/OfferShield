@@ -11,6 +11,6 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check tests/analysis.test.js && node --check tests/server.test.js && node --check tests/static-page.test.js"
+    "check": "node --check server.js && node --check workers/api.js && node --check workers/intelligence-core.js && node --check tests/analysis.test.js && node --check tests/server.test.js && node --check tests/static-page.test.js && node --check tests/intelligence-core.test.js && node --check tests/worker.test.js"
   }
 }
