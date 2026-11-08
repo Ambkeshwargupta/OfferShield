@@ -415,12 +415,19 @@ function buildRecruitmentFootprint(){
  ];
  $("#footprintResult").innerHTML='<div class="note">These are independent public-search links. Search results may be outdated, copied or impersonated; compare any vacancy with the company&#39;s own careers site.</div><div class="quick">'+links.map(x=>'<a class="btn" target="_blank" rel="noopener noreferrer" href="'+esc(x[1])+'">'+esc(x[0])+' ↗</a>').join("")+'</div>';
 }
-function buildRecruiterChecks(){
+async function buildRecruiterChecks(){
  const name=$("#recruiterName").value.trim(),company=$("#recruiterCompany").value.trim(),email=$("#recruiterEmail").value.trim();if(!name||!company){toast("Enter the recruiter name and claimed company.");return}
  const q=encodeURIComponent('"'+name+'" "'+company+'"');
- const links=[["LinkedIn people search","https://www.linkedin.com/search/results/people/?keywords="+encodeURIComponent(name+" "+company)],["Company website search","https://www.google.com/search?q="+q+"+site%3A"+encodeURIComponent(company.toLowerCase().replace(/[^a-z0-9]+/g,"")+".com")],["Public web search","https://www.google.com/search?q="+q],["LinkedIn company search","https://www.linkedin.com/search/results/companies/?keywords="+encodeURIComponent(company)]];
- let domain=email.includes("@")?email.split("@").pop().toLowerCase():"";
- $("#recruiterResult").innerHTML='<div class="note"><strong>Candidate-provided identity:</strong> '+esc(name)+' · '+esc(company)+(email?' · '+esc(email):'')+'. These are search routes, not verified employment records.</div>'+(domain?'<div class="detail-row"><span>Email domain</span><b>'+esc(domain)+'</b></div>':"")+'<div class="quick">'+links.map(x=>'<a class="btn" href="'+esc(x[1])+'" target="_blank" rel="noopener noreferrer">'+esc(x[0])+' ↗</a>').join("")+'</div><div class="note" style="margin-top:10px">Confirm the person&#39;s role through a separately sourced company switchboard or recruitment contact. A public profile or matching email domain is not proof of current employment or authority to issue the offer.</div>';
+ const links=[["LinkedIn people search","https://www.linkedin.com/search/results/people/?keywords="+encodeURIComponent(name+" "+company)],["Company website search","https://www.google.com/search?q="+q+"+official+careers"],["Public web search","https://www.google.com/search?q="+q],["LinkedIn company search","https://www.linkedin.com/search/results/companies/?keywords="+encodeURIComponent(company)]];
+ const domain=email.includes("@")?email.split("@").pop().toLowerCase():"";
+ $("#recruiterResult").innerHTML='<div class="note"><strong>Candidate-provided identity:</strong> '+esc(name)+' · '+esc(company)+(email?' · '+esc(email):'')+'. These are search routes, not verified employment records.</div>'+(domain?'<div class="detail-row"><span>Email domain</span><b>'+esc(domain)+'</b></div>':"")+'<div class="quick">'+links.map(x=>'<a class="btn" href="'+esc(x[1])+'" target="_blank" rel="noopener noreferrer">'+esc(x[0])+' ↗</a>').join("")+'</div><div class="note" style="margin-top:10px">Confirm the person&#39;s role through a separately sourced company switchboard or recruitment contact. A public profile or matching email domain is not proof of current employment or authority to issue the offer.</div><div id="officialContactLookup" style="margin-top:12px"></div>';
+ if(domain&&workerApiBase()){
+  const box=$("#officialContactLookup");box.innerHTML='<div class="loading">Checking company-published contact directory…</div>';
+  try{
+   const data=await workerRequest("/v1/contacts?domain="+encodeURIComponent(domain));
+   box.innerHTML=data.contacts?.length?'<h4 style="margin:8px 0">Company-published contacts in source register</h4>'+data.contacts.map(x=>'<div class="contact-row"><div><b>'+esc(x.contact_type)+'</b><p>'+esc(x.source_publisher)+' · '+esc(x.evidence_status)+' · '+esc(x.last_checked_at||"No refresh timestamp")+'</p><a href="'+esc(x.source_url)+'" target="_blank" rel="noopener noreferrer">Open employer source ↗</a></div><a href="'+(String(x.contact_value).includes("@")?"mailto:":"tel:")+esc(x.contact_value)+'">'+esc(x.contact_value)+'</a></div>').join(""):'<div class="note">No matching company-published contact is in the connected source registry. This is not evidence that no official contact exists; open the employer website and use its published contact channel.</div>';
+  }catch(error){box.innerHTML='<div class="note">Contact directory unavailable: '+esc(error.message)+'. Use the employer website directly.</div>'}
+ }
 }
 async function testWorkerConnection(){
  if(!workerApiBase()){toast("Paste your Worker URL first.");return}
