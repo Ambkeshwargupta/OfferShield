@@ -55,3 +55,12 @@ test("MCA records are visibly distinct from community discovery", () => {
   assert.match(html, /Wikidata result — not registry verified/);
   assert.match(html, /not a live MCA portal query/);
 });
+
+test("overview shortcut is directly wired to Advanced Intelligence", () => {
+  assert.match(html, /advancedNav\.onclick=\(\)=>go\("advanced"\)/);
+});
+
+test("advanced search recognises email and URL domain inputs without a Worker", () => {
+  assert.match(html, /domainCandidate=query\.includes\("@"\)/);
+  assert.match(html, /query\.replace\(\/\^https\?/);
+});
