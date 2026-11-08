@@ -300,5 +300,16 @@ export default {
     catch (error) {
       return jsonError("The intelligence service encountered an unexpected error. Please retry.",500,corsOrigin(request,env)||"*","internal_error");
     }
+  },
+  async scheduled(controller, env, ctx) {
+    if (!env.DB) return;
+    ctx.waitUntil((async () => {
+      const minuteBucket = Math.floor(Date.now() / 60000);
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM api_cache WHERE expires_at < ?").bind(Date.now()),
+        env.DB.prepare("DELETE FROM company_observations WHERE expires_at IS NOT NULL AND expires_at < ?").bind(Date.now()),
+        env.DB.prepare("DELETE FROM rate_limits WHERE bucket < ?").bind(minuteBucket - 2880)
+      ]);
+    })());
   }
 };
