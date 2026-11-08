@@ -36,3 +36,22 @@ test("third-party website matches are not labelled as verified company domains",
   assert.match(html, /Domain matches a third-party listed website/);
   assert.match(html, /does not authenticate the sender/);
 });
+
+test("advanced intelligence UI exposes government, domain and email investigation", () => {
+  assert.match(html, /Advanced search &amp; intelligence|Advanced search & intelligence/);
+  assert.match(html, /advancedQuery/);
+  assert.match(html, /domainCheckBtn/);
+  assert.match(html, /rawEmailHeaders/);
+  assert.match(html, /recruiterCheckBtn/);
+  assert.match(html, /workerApiUrl/);
+  assert.match(html, /offershield_worker_api/);
+  assert.match(html, /\/v1\/search/);
+  assert.match(html, /\/v1\/domain/);
+  assert.match(html, /\/v1\/email\/headers/);
+});
+
+test("MCA records are visibly distinct from community discovery", () => {
+  assert.match(html, /Official government dataset record/);
+  assert.match(html, /Wikidata result — not registry verified/);
+  assert.match(html, /not a live MCA portal query/);
+});
