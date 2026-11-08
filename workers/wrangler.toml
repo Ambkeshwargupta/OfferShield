@@ -1,0 +1,17 @@
+name = "offershield-intelligence"
+main = "api.js"
+compatibility_date = "2026-11-08"
+workers_dev = true
+
+[vars]
+APP_NAME = "OfferShield Intelligence API"
+ALLOWED_ORIGIN = "https://ambkeshwargupta.github.io"
+
+# Create a D1 database, then replace the placeholder database_id and uncomment:
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "offershield-intelligence"
+# database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Store DATA_GOV_API_KEY as a Worker secret, never in this file:
+# npx wrangler secret put DATA_GOV_API_KEY
