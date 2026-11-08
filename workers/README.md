@@ -1,56 +1,71 @@
 # OfferShield Intelligence API (Cloudflare Workers + D1)
 
-This API is separate from GitHub Pages. GitHub Pages hosts the static premium website; Cloudflare Workers executes server-side integrations and D1 caches official company records.
+This API is separate from GitHub Pages. GitHub Pages hosts the static premium website; Cloudflare Workers executes server-side integrations and D1 caches public company evidence.
 
 ## Current capabilities
 
-- MCA Company Master Data lookup through the official data.gov.in resource.
-- Company name discovery through exact OGD matching plus Wikidata discovery candidates.
-- CIN / LLPIN exact lookup.
+- MCA Company Master Data lookup through the data.gov.in resource (CIN and exact company-name filters).
+- Wikidata third-party company discovery candidates.
+- CIN recognition and MCA company data query.
+- LLPIN recognition with correct manual MCA fallback; LLPIN is **not** sent to a CIN-only OGD filter.
+- GSTIN and Udyam recognition with official manual lookup routes.
+- Company/domain/email input classification.
 - Domain intelligence: A, AAAA, MX, TXT, NS and DMARC DNS records.
 - Public RDAP registration-data lookup.
-- Raw email-header parsing: From, Reply-To, Return-Path, Authentication-Results and DKIM selector/domain extraction.
-- Capability reporting and evidence/limitations labels.
-- D1 API response cache, company observations, contact evidence registry and hashed-IP rate limiting.
+- Original email-header parsing: From, Reply-To, Return-Path, Authentication-Results and DKIM selector/domain extraction; optional comparison against a company-published domain.
+- Company-published recruitment/fraud contact lookup from the D1 source register.
+- Evidence labels and explicit limitations.
+- D1 API response cache, company claim observations, contact evidence and hashed-IP rate limiting.
 
-## Free setup
+## One-time free setup
+
+You need a Cloudflare account and a data.gov.in account. Do not send either account password or API key in chat.
 
 1. Create a free Cloudflare account: https://dash.cloudflare.com/sign-up
-2. Install Wrangler locally: `npm install -g wrangler`
-3. Authenticate: `wrangler login`
-4. Create D1: `wrangler d1 create offershield-intelligence`
-5. Copy the returned database ID into `wrangler.toml` and uncomment the D1 binding.
-6. Apply schema: `wrangler d1 execute offershield-intelligence --file=workers/schema.sql --remote` (run from the repository root with the path `workers/schema.sql`).
-7. Get a data.gov.in key from https://data.gov.in/ after creating a free account. The MCA dataset is https://www.data.gov.in/catalog/company-master-data.
-8. Set the key securely: `wrangler secret put DATA_GOV_API_KEY`.
-9. From the `workers` directory run `npx wrangler deploy`.
+2. Install Node.js 20+ if not already installed, then clone this repository.
+3. Open a terminal in the repository's `workers` directory:
+   `cd OfferShield/workers`
+4. Install Wrangler:
+   `npm install -g wrangler`
+   (Alternatively use `npx wrangler` in each command.)
+5. Authenticate with Cloudflare:
+   `wrangler login`
+6. Create the D1 database:
+   `wrangler d1 create offershield-intelligence`
+7. Copy the returned database ID into `workers/wrangler.toml`. Uncomment the `[[d1_databases]]` block and replace `REPLACE_WITH_D1_DATABASE_ID` with the ID from Cloudflare. The database name must stay `offershield-intelligence`.
+8. Apply the D1 schema from the `workers` directory:
+   `wrangler d1 execute offershield-intelligence --file=schema.sql --remote`
+9. Create a free account at https://data.gov.in/ and generate an API key from its API/account area. Review the catalogue at https://www.data.gov.in/catalog/company-master-data.
+10. Store the API key as a secret (while still in `workers`):
+    `wrangler secret put DATA_GOV_API_KEY`
+    Paste the key into the terminal prompt. Do not put it in `wrangler.toml`, `.dev.vars.example`, HTML, browser storage or GitHub.
+11. Deploy:
+    `wrangler deploy`
+12. Copy the Worker URL (for example `https://offershield-intelligence.<your-subdomain>.workers.dev`).
+13. Open https://ambkeshwargupta.github.io/OfferShield/ → **Advanced search & intelligence** → **Intelligence API connection**. Paste the Worker URL, click **Connect API**, then **Test**.
 
-If you do not configure the D1 binding, endpoints still run but cache and rate limiting are unavailable. Configure D1 before public use.
+The GitHub Pages origin is already allowed in the Worker CORS list. To use a custom domain later, add that exact origin to `ALLOWED_ORIGINS` in `wrangler.toml` and redeploy.
 
-## Attach API to the GitHub Pages UI
+## Optional: change the OGD resource
 
-After deployment, copy the Worker URL (for example `https://offershield-intelligence.<your-subdomain>.workers.dev`). In OfferShield, open **Advanced Search & Intelligence → API connection**, paste the URL and save. The URL is public and contains no secret. The data.gov.in key remains inside the Cloudflare Worker secret store.
-
-Allowed browser origins are in `api.js`. The default permits the published OfferShield GitHub Pages origin and localhost. Add your own origin only if you control it.
+The Worker defaults to resource ID `4dbe5667-7b6b-41d7-82af-211562424d9a`. If the OGD catalogue presents a replacement resource, set `DATA_GOV_RESOURCE_ID` as a Worker variable and redeploy. The Worker validates the value as a UUID. Confirm the resource schema and field names before changing it.
 
 ## Official source semantics
 
-The current data.gov.in resource is:
-`https://api.data.gov.in/resource/4dbe5667-7b6b-41d7-82af-211562424d9a`
+The OGD Company Master Data feed is a periodic government-published snapshot. It is not a live MCA portal transaction and it does not prove that a specific recruiter, vacancy or offer is authorised. The exact CompanyName filter may miss punctuation, abbreviations or brand/legal-entity variations. Fuzzy suggestions are community discovery candidates only.
 
-The company master dataset is periodic and exact filters should be used. It is not a live MCA portal query. Name filters should be treated as exact-match only; fuzzy suggestions are community discovery candidates.
+This connector does not imply that all MCA filings, directors, charges, financial statements or LLP records are included. GST and Udyam remain official manual lookup flows in this release; no CAPTCHA bypass or restricted scraping is used.
 
-The API does not include directors, all filings, charges, full financial statements, or the identity/authority of recruiters. These are not fabricated or inferred.
+## Free-tier notes
 
-## Deploy from GitHub
+Cloudflare Workers and D1 have free quotas, but their limits, enforcement and prices can change. Check the current [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) and [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/) before public traffic grows. D1 must be configured for the Worker cache, source observations, contact directory and distributed rate limiting to persist.
 
-Connect the repository to Cloudflare Workers Builds or deploy with Wrangler from a local clone. Configure the D1 binding and Worker secret in Cloudflare. Never commit API keys, tokens or account identifiers to GitHub.
+## Operational and security notes
 
-## Operational notes
-
-- D1 caches OGD responses for 24 hours by default.
+- D1 caches OGD responses for 24 hours and records returned claim-level observations with source ID, retrieval time and expiry.
 - DNS is queried through Google Public DNS-over-HTTPS.
-- RDAP is used for registration data; privacy-redacted fields are expected.
-- The worker never fetches arbitrary user-supplied web pages, which reduces SSRF risk.
-- Rate-limit hashes are derived from Cloudflare's connecting IP; raw IP addresses are not stored.
+- RDAP data can be privacy-redacted or unavailable.
+- The Worker never fetches arbitrary user-supplied web pages, reducing SSRF risk.
+- Rate-limit hashes derive from Cloudflare's connecting IP; raw IPs are not stored.
+- Raw email headers pasted into the Worker are processed for the response and are not intentionally persisted; users should still redact personal data and only connect a Worker they control.
 - Review Cloudflare, data.gov.in, Google Public DNS and RDAP usage terms and quotas before broad public launch.
