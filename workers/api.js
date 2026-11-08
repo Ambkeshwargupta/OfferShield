@@ -125,6 +125,11 @@ async function resolveSearch(query, env) {
     const ogd = await ogdLookup(env, "CIN", identifier.value, 5);
     return { query, identifier, registry: ogd.records.map(r => companyResponse(r)), registryConfigured: ogd.configured, registryError: ogd.error || null, discovery: [], manualLookup: "https://www.mcacdm.nic.in/company-master-details" };
   }
+  if (identifier.type === "Udyam reference") {
+    return { query, identifier, registry: [], registryConfigured: false, discovery: [], manualLookup: "https://udyamregistration.gov.in/Udyam_Verify.aspx", notes: ["Udyam verification remains a manual official-portal step in this release."] };
+  }
+  const domain = validPublicDomain(query);
+  if (domain) return { query, identifier, registry: [], registryConfigured: false, discovery: [], domain, manualLookup: "https://www.mcacdm.nic.in/company-master-details" };
   if (identifier.type === "Company name") {
     const ogd = await ogdLookup(env, "CompanyName", identifier.value, 5);
     const discovery = await wikidataSearch(query);
@@ -134,8 +139,6 @@ async function resolveSearch(query, env) {
   if (identifier.type === "GSTIN") {
     return { query, identifier, registry: [], registryConfigured: false, discovery: [], manualLookup: "https://services.gst.gov.in/services/searchtp", notes: ["GST public taxpayer lookup remains an official manual verification route in this release."] };
   }
-  const domain = validPublicDomain(query);
-  if (domain) return { query, identifier, registry: [], registryConfigured: false, discovery: [], domain, manualLookup: "https://www.mcacdm.nic.in/company-master-details" };
   return { query, identifier, registry: [], registryConfigured: false, discovery: await wikidataSearch(query), manualLookup: "https://www.mcacdm.nic.in/company-master-details" };
 }
 async function dnsQuery(name, type) {
