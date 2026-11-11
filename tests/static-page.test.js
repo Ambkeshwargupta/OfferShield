@@ -41,6 +41,11 @@ test("public digital footprint report displays indexed LinkedIn, history, jobs a
   assert.match(html, /recruiterEmailEvidence/);
 });
 
+test("public footprint section separates ecosystem partner signals from company history", () => {
+  assert.match(html, /Partners and ecosystem network/);
+  assert.match(html, /ecosystemNetworkResults/);
+});
+
 test("public search privacy notice excludes uploaded evidence and recruiter email from search provider", () => {
   assert.match(html, /uploaded files, chat text and recruiter email address are not sent to that search provider/);
 });
