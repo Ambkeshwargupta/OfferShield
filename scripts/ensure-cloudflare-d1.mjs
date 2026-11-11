@@ -1,76 +1,62 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
 
 const databaseName = "offershield-intelligence";
 const configPath = "workers/wrangler.toml";
+const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+const token = process.env.CLOUDFLARE_API_TOKEN;
 
-function parseJson(output, command) {
-  const trimmed = output.replace(/^\uFEFF/, "").trim();
-  try { return JSON.parse(trimmed); } catch {
-    const starts = [trimmed.indexOf("["), trimmed.indexOf("{")].filter(x => x >= 0);
-    if (!starts.length) throw new Error(command + " did not return JSON.");
-    const start = Math.min(...starts);
-    try { return JSON.parse(trimmed.slice(start)); } catch {
-      throw new Error("Could not parse JSON from " + command + ".");
+if (!accountId || !token) throw new Error("CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required.");
+
+async function cloudflareApi(path, options = {}) {
+  const response = await fetch("https://api.cloudflare.com/client/v4" + path, {
+    ...options,
+    headers: {
+      authorization: "Bearer " + token,
+      "content-type": "application/json",
+      ...(options.headers || {})
     }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.success === false) {
+    const messages = (data.errors || []).map(x => x.message).filter(Boolean);
+    throw new Error("Cloudflare D1 API request failed (" + response.status + "): " + (messages.join("; ") || response.statusText));
   }
+  return data;
 }
 
-function findDatabase(value) {
-  if (!value) return null;
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = findDatabase(item);
-      if (found) return found;
-    }
-    return null;
-  }
-  if (typeof value !== "object") return null;
-  const name = value.name || value.database_name || value.databaseName;
-  const id = value.uuid || value.database_id || value.databaseId || value.id;
-  if (name === databaseName && typeof id === "string" && id.length > 10) return { name, id };
-  for (const [key, nested] of Object.entries(value)) {
-    if (["result", "databases", "items", "data"].includes(key)) {
-      const found = findDatabase(nested);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-function run(command, args) {
-  return execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
-}
-
-let config = await readFile(configPath, "utf8");
-const d1ListOutput = run("wrangler", ["d1", "list", "--json", "--config", configPath]);
-const d1List = parseJson(d1ListOutput, "wrangler d1 list");
-let database = findDatabase(d1List);
+const endpoint = "/accounts/" + encodeURIComponent(accountId) + "/d1/database";
+const listed = await cloudflareApi(endpoint + "?name=" + encodeURIComponent(databaseName) + "&per_page=10000");
+let database = (listed.result || []).find(item => item.name === databaseName);
 
 if (!database) {
   console.log("Creating the remote D1 database in APAC: " + databaseName);
-  run("wrangler", ["d1", "create", databaseName, "--location", "apac", "--binding", "DB", "--use-remote", "--update-config", "--config", configPath]);
-  config = await readFile(configPath, "utf8");
+  const created = await cloudflareApi(endpoint, {
+    method: "POST",
+    body: JSON.stringify({ name: databaseName, primary_location_hint: "apac" })
+  });
+  database = created.result;
+}
+if (!database?.uuid) throw new Error("Cloudflare did not return a D1 database UUID.");
+
+let config = await readFile(configPath, "utf8");
+const bindingPattern = /^\\[\\[d1_databases\\]\\][\\s\\S]*?^binding\\s*=\\s*"DB"\\s*$/m;
+if (!bindingPattern.test(config)) {
+  config = config.replace(/\\s*# Create a D1 database[\\s\\S]*?(?=\\n# Store DATA_GOV_API_KEY)/, "");
+  config = config.replace(/\\s*$/, "") + [
+    "",
+    "[[d1_databases]]",
+    'binding = "DB"',
+    'database_name = "' + databaseName + '"',
+    'database_id = "' + database.uuid + '"',
+    ""
+  ].join("\\n");
 } else {
-  console.log("Found existing D1 database: " + databaseName);
-  const activeBlock = /^\[\[d1_databases\]\][\s\S]*?(?=^\[\[|^\[[^\[]|\s*$)/m;
-  const hasBinding = /^\[\[d1_databases\]\][\s\S]*?^binding\s*=\s*"DB"/m.test(config);
-  if (!hasBinding) {
-    const block = [
-      "",
-      "[[d1_databases]]",
-      'binding = "DB"',
-      'database_name = "' + databaseName + '"',
-      'database_id = "' + database.id + '"',
-      ""
-    ].join("\n");
-    config = config.replace(/\s*# Create a D1 database[\s\S]*?(?=\n# Store DATA_GOV_API_KEY)/, "");
-    config = config.replace(/\s*$/, "") + block;
+  const existingBlock = config.match(/^\\[\\[d1_databases\\]\\]([\\s\\S]*?)(?=^\\[\\[|^\\[[^\\[]|$)/m)?.[1] || "";
+  if (!existingBlock.includes('database_name = "' + databaseName + '"') ||
+      !existingBlock.includes('database_id = "' + database.uuid + '"')) {
+    throw new Error("workers/wrangler.toml has a D1 DB binding, but it does not match the Cloudflare database found. Review it before redeploying.");
   }
 }
 
-if (!/^\[\[d1_databases\]\][\s\S]*?^binding\s*=\s*"DB"/m.test(config)) {
-  throw new Error("Could not configure the D1 DB binding in workers/wrangler.toml.");
-}
 await writeFile(configPath, config, "utf8");
-console.log("D1 database is configured as env.DB. Database ID is stored in workers/wrangler.toml (not a secret).");
+console.log("D1 is ready: " + databaseName + ". The database UUID is stored in workers/wrangler.toml; it is not a secret.");
