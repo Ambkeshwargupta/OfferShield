@@ -2,7 +2,7 @@
 
 **Know who's behind the offer.**
 
-OfferShield is an India-first company and recruitment due-diligence platform. Candidates can investigate company identity, government-published master data, public digital footprint, recruitment guidance, official contacts, technical domains and email headers — then assemble an evidence-led report.
+OfferShield is an India-first company and recruitment due-diligence platform focused on students evaluating internships and fresher job offers, including opportunities advertised by startups and small companies. Students can investigate company identity, upload chat screenshots and offer documents, inspect public domain signals, extract recruitment stages and terms, and receive an evidence-led review with practical questions and next steps.
 
 > OfferShield is an investigation aid, not a fraud verdict, legal opinion, background check or guarantee that an offer is genuine. A legal registration, professional profile, convincing document, DNS record or matching email domain does not prove that a specific recruiter or vacancy is authorised.
 
@@ -21,8 +21,10 @@ OfferShield is an India-first company and recruitment due-diligence platform. Ca
 - Search open-data company candidates through Wikidata.
 - Add a manual investigation for companies not found in structured sources.
 - Display official government and company-owned source links.
-- Analyse pasted offer/recruitment messages and compare domains with available company reference domains.
-- Save reports locally in the current browser.
+- Paste recruiter conversations and internship descriptions, or upload chat screenshots, offer letters and supporting files (PDF, DOCX, ODT, HTML, XML, PNG, JPG or WEBP).
+- Use the connected Worker and Workers AI to extract evidence and analyse offer terms, payment requests, recruitment stages, missing details and consistency/risk signals.
+- Display stages mentioned in the student's evidence separately from generic possible stages; never present them as company-confirmed.
+- Save the analysis summary locally in the current browser. Original uploaded file bytes are not included in the saved report.
 
 ### Advanced intelligence UI
 - Search by company name, CIN, LLPIN, GSTIN or domain.
@@ -43,6 +45,8 @@ OfferShield is an India-first company and recruitment due-diligence platform. Ca
 - Wikidata discovery candidates.
 - DNS-over-HTTPS and RDAP lookups.
 - Email header parser.
+- AI-assisted internship/offer investigation endpoint (POST /v1/investigate) using Workers AI Markdown Conversion and Llama 3.3 70B JSON-mode inference.
+- Screenshot/document evidence extraction, domain DNS/RDAP signals, MCA indexed-name lookup and structured student-facing assessment.
 - D1-backed API response cache and rate limit buckets when D1 is configured.
 
 ## Run the Node prototype locally
@@ -67,12 +71,13 @@ Follow [workers/README.md](workers/README.md). In summary:
 
 1. Create a Cloudflare account and authenticate Wrangler.
 2. Create a D1 database and apply `workers/schema.sql`.
-3. Add the D1 binding to `workers/wrangler.toml`.
-4. Obtain a free data.gov.in API key and store it using `wrangler secret put DATA_GOV_API_KEY`.
-5. Deploy the Worker.
+3. Add the D1 binding to workers/wrangler.toml when using D1 features.
+4. Enable the Workers AI binding ([ai] binding = "AI" is included in the supplied Wrangler config) for document conversion and AI offer analysis.
+5. Obtain a data.gov.in API key and store it using wrangler secret put DATA_GOV_API_KEY.
+6. Deploy the Worker.
 6. Paste the Worker URL into OfferShield → Advanced Search & Intelligence → API connection.
 
-Never put the government API key in `docs/index.html`, browser local storage or GitHub.
+Never put the government API key in docs/index.html, browser local storage or GitHub. Workers AI inference is usage-metered; check current Cloudflare pricing and usage before inviting students to upload files.
 
 ## Data source coverage and limitations
 
@@ -84,7 +89,8 @@ Never put the government API key in `docs/index.html`, browser local storage or 
 - LinkedIn and job boards are linked for manual review; they are not scraped.
 - DNS/RDAP/SPF/DMARC signals describe technical records and do not establish company ownership or recruiter authority.
 - Pasted raw email headers can be altered; only original mailbox headers should be relied on, and authentication results are not proof of offer authority.
-- The GitHub Pages version saves reports in that browser only. Multi-user accounts and central report storage require a separate production backend and authentication layer.
+- The GitHub Pages version saves reports in that browser only. Original uploads are processed by the connected Cloudflare Worker/Workers AI and are not persisted by the OfferShield application; the resulting summary can be saved in browser storage. Multi-user accounts and central report storage require a separate production backend and authentication layer.
+- AI findings are not independent source verification. Website/job-board searches are presented as follow-up discovery links; restricted professional profiles are not scraped. Recruiter employment and vacancy authorisation remain unverified unless confirmed through an independently sourced employer channel.
 
 ## Deployment options
 
