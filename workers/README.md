@@ -135,24 +135,35 @@ npx wrangler deploy
 
 The same data.gov.in key is used for both MCA and Udyam API routes. D1 is optional for the national R2-backed company-name search; without D1, caching and database rate limiting are unavailable.
 
-#### 5. Run the full national import
+#### 5. Run the national import
 
 Open **GitHub → Actions → MCA national company index import → Run workflow**.
 
-For a safe R2 upload test, set `max_records` to `1000`. Once that succeeds, run it again with `max_records` set to `0` to fetch the complete current MCA snapshot. The workflow:
+There are two modes:
 
-1. Downloads the dataset from the verified OGD portal endpoint in resumable pages.
-2. Creates a bounded-memory token index in compressed NDJSON shards.
-3. Uploads those shards and an index manifest to the dedicated R2 bucket.
-4. Prints counts and the source snapshot date, not the company rows or API key.
+- **Test:** set \`max_records\` to \`1000\`. This downloads and indexes a small sample, then uploads it to \`staging/index/\`. It does not replace the live search index.
+- **Full national import:** set \`max_records\` to \`0\`. This resumes from the checkpoint stored in R2, downloads the remaining MCA snapshot and publishes only after the downloaded source and generated index pass coverage checks.
 
-The import can take time and is subject to data.gov.in availability and rate limits. If interrupted, the download tool supports `--resume`; rerun the workflow only after checking the previous run and the local checkpoint. A GitHub-hosted runner is ephemeral, so a new run does not automatically retain the previous runner's `.data` directory. The resumable checkpoint is useful for local runs; for a new hosted runner, the workflow currently starts a fresh download.
+The workflow is designed for runner restarts:
+
+1. It restores \`ingestion/mca/checkpoint.json\` from R2.
+2. It downloads the next OGD page, normalizes it and compresses it.
+3. It uploads the page to \`ingestion/mca/pages/\`.
+4. Only after the page upload succeeds, it advances and uploads the checkpoint.
+5. It restores all persisted pages, assembles the normalized snapshot and builds the search index.
+6. It checks the indexed company count against the checkpoint before publishing.
+
+If the GitHub Actions runner is interrupted, run the workflow again with \`max_records=0\`. It resumes from the last successfully persisted page; a page that uploaded before its checkpoint did not will simply be downloaded and overwritten at the same object key.
+
+The index is published under the separate \`index/\` prefix. The \`--delete\` operation is scoped to that prefix and cannot delete the raw ingestion pages or checkpoint. Test runs publish to \`staging/index/\` so they cannot accidentally replace production search data.
+
+The index builder creates one \`manifest.json\` for each token. Each manifest lists all compressed posting shards and the number of company records for that token. This lets the Worker choose a relatively selective token before scanning postings. Very broad tokens can still exceed the Worker request budget; those searches are explicitly marked \`partial\` and should be narrowed with more of the company name.
 
 #### 6. Connect and verify
 
 After the Worker deploys, open OfferShield → **Advanced search & intelligence** → **Intelligence API connection**. Paste the Worker URL and connect it. Then search a company name such as `Infosys` or `Tata Motors`.
 
-The response includes `nationalIndex` metadata: index availability, matched record count, search strategy, and whether a broad token partition was capped. Each returned MCA result is labelled as a government dataset record and links back to its source catalogue.
+The response includes `nationalIndex` metadata: index availability, returned match count, search strategy, selected token and whether the query was capped by the R2 request budget. Each returned MCA result is labelled as a government dataset record and links back to its source catalogue. The national index is complete only for the snapshot that was actually imported and published.
 
 ### Optional D1 index
 
