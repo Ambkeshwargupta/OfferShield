@@ -276,3 +276,80 @@ test("company name search uses the R2 token manifest and scans the rarest token"
   }
 });
 
+
+
+test("internship investigation requires Workers AI for document and offer analysis",async()=>{
+  const form=new FormData();
+  form.set("messageText","I received an internship offer and want to check it.");
+  const response=await worker.fetch(
+    new Request("https://api.example.workers.dev/v1/investigate",{method:"POST",body:form}),
+    env(),ctx
+  );
+  const body=await response.json();
+  assert.equal(response.status,503);
+  assert.equal(body.error.code,"ai_not_enabled");
+});
+
+test("AI internship review parses uploaded files and separates claimed stages from confirmed company policy",async()=>{
+  let convertedNames=[];
+  let modelInput="";
+  const ai={
+    async toMarkdown(documents){
+      convertedNames=documents.map(item=>item.name);
+      return documents.map(item=>({
+        name:item.name,
+        format:"markdown",
+        data:"Internship role: Frontend Developer Intern. Selection stages mentioned: coding task followed by two interviews. Stipend INR 12000 per month. Duration 3 months."
+      }));
+    },
+    async run(model,input){
+      assert.equal(model,"@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+      modelInput=input.messages.map(message=>message.content).join("\n");
+      return {response:{
+        verdict:"caution",
+        riskLevel:"elevated",
+        headline:"Confirm the recruiter and offer terms independently",
+        summary:"The uploaded offer describes an internship and selection process, but the recruiter and vacancy have not been independently authenticated.",
+        claimedCompany:"Example Startup",
+        role:"Frontend Developer Intern",
+        stipend:"INR 12,000 per month",
+        duration:"3 months",
+        workModeAndLocation:"Remote",
+        explicitRecruitmentStages:["Coding task","Two interviews"],
+        companyStagesConfirmed:true,
+        typicalPossibleStages:["Application screening","Role interview","Written offer"],
+        stageNote:"These stages were mentioned in the student-supplied offer letter.",
+        redFlags:["Recruiter authority has not been independently verified."],
+        consistencySignals:["The offer states a role, stipend and duration."],
+        missingInformation:["No independently published recruiter contact was provided."],
+        questionsToAsk:["Can the company confirm this vacancy using its official contact channel?"],
+        nextSteps:["Contact the company using an independently sourced official contact."]
+      }};
+    }
+  };
+  const form=new FormData();
+  form.set("companyName","Example Startup");
+  form.set("recruiterName","Alex Recruiter");
+  form.set("recruiterEmail","alex@example-startup.in");
+  form.set("messageText","Please review this internship opportunity.");
+  form.append("files",new File([Buffer.from("synthetic PDF fixture")],"internship-offer.pdf",{type:"application/pdf"}),"internship-offer.pdf");
+
+  const response=await worker.fetch(
+    new Request("https://api.example.workers.dev/v1/investigate",{method:"POST",body:form}),
+    env({AI:ai}),ctx
+  );
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.deepEqual(convertedNames,["internship-offer.pdf"]);
+  assert.match(modelInput,/Alex Recruiter/);
+  assert.match(modelInput,/alex@example-startup\.in/);
+  assert.equal(body.aiEnabled,true);
+  assert.equal(body.verdict,"caution");
+  assert.deepEqual(body.recruitmentStages.explicitStages,["Coding task","Two interviews"]);
+  assert.equal(body.recruitmentStages.stagesFoundInProvidedEvidence,true);
+  assert.equal(body.recruitmentStages.companyStagesConfirmed,false);
+  assert.equal(body.recruiterProvided.name,"Alex Recruiter");
+  assert.equal(body.recruiterProvided.email,"alex@example-startup.in");
+  assert.equal(body.uploadedEvidence.length,1);
+  assert.equal(body.privacy.filesPersisted,false);
+});
