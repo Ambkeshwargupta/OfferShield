@@ -8,6 +8,11 @@ on:
         required: true
         default: "0"
         type: string
+      reset_import:
+        description: "Start a fresh MCA snapshot by deleting only persisted ingestion pages and checkpoint (keeps the live index)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -55,10 +60,17 @@ jobs:
 
       - name: Restore persistent MCA checkpoint
         shell: bash
+        env:
+          RESET_IMPORT: ${{ inputs.reset_import }}
         run: |
           set -euo pipefail
           mkdir -p .data/mca/pages
-          if aws s3 ls "s3://$R2_BUCKET_NAME/ingestion/mca/checkpoint.json" \
+          if [ "$RESET_IMPORT" = "true" ]; then
+            echo "Starting a fresh source snapshot. Removing only ingestion/mca/; the published index/ remains untouched."
+            aws s3 rm "s3://$R2_BUCKET_NAME/ingestion/mca/" --recursive \
+              --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com" \
+              --region auto --only-show-errors
+          elif aws s3 ls "s3://$R2_BUCKET_NAME/ingestion/mca/checkpoint.json" \
             --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com" >/dev/null 2>&1; then
             aws s3 cp "s3://$R2_BUCKET_NAME/ingestion/mca/checkpoint.json" \
               ".data/mca/r2-checkpoint.json" \
