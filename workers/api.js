@@ -260,7 +260,7 @@ function companyIndexQuery(query) {
   return [...new Set(tokens)].filter(token => token.length >= 3 && !COMPANY_NAME_STOP_WORDS.has(token)).slice(0, 3);
 }
 
-const MAX_R2_SHARDS_PER_SEARCH = 32;
+const MAX_R2_SHARDS_PER_SEARCH = 16;
 const MAX_R2_PREFIX_MANIFESTS = 8;
 
 function rowMatchesSearchTokens(row, tokens) {
