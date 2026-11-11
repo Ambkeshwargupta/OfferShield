@@ -119,6 +119,7 @@ jobs:
               status:response.status,
               service:data.service,
               version:data.version,
+              webSearchConfigured:data.webSearchConfigured,
               aiConfigured:data.aiConfigured,
               documentConversionConfigured:data.documentConversionConfigured,
               d1Configured:data.d1Configured,
