@@ -679,6 +679,8 @@ async function analyseInternshipUpload(request, env, origin) {
     ...(evidence.match(/\bhttps?:\/\/[^\s<>"'()]+/gi) || []).map(x=>x.replace(/[.,;:!?]+$/,"")),
     ...(jobSourceUrl ? [jobSourceUrl] : [])
   ])];
+  const cins = [...new Set(evidence.toUpperCase().match(/\b[LU]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}\b/g) || [])];
+  const gstins = [...new Set(evidence.toUpperCase().match(/\b\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]\b/g) || [])];
   const paymentLines = evidence.split(/[.!?\n]+/).map(x=>x.trim()).filter(x =>
     !/(no|without|never|not)\s+(any\s+)?(registration|processing|training|security|verification)\s*(fee|charge|deposit)/i.test(x) &&
     /(registration\s+fee|processing\s+fee|training\s+fee|security\s+deposit|verification\s+fee|refundable\s+deposit|pay.{0,40}(₹|rs\.?|inr|upi)|transfer.{0,40}(₹|rs\.?|inr|upi))/i.test(x)
@@ -695,8 +697,25 @@ async function analyseInternshipUpload(request, env, origin) {
   const domainChecks = await Promise.all(domains.map(domain=>domainIntelligence(domain)));
   let mcaRecords = [];
   let mcaSearch = {available:false,partial:false};
-  if (companyName.length >= 2) {
-    try {
+  try {
+    if (cins.length) {
+      const indexed = await searchNationalCompanyIndex(env,cins[0],5);
+      mcaRecords = (indexed.records || []).map(row=>({
+        name:row.name,identifier:row.identifier || row.cin,status:row.status,
+        registrationDate:row.registrationDate,source:"MCA Company Master Data",
+        sourceUrl:"https://www.data.gov.in/catalog/company-master-data"
+      }));
+      mcaSearch = {available:!!indexed.available,partial:false,strategy:indexed.strategy || "cin_lookup"};
+      if (!mcaRecords.length && env.DATA_GOV_API_KEY) {
+        const direct = await ogdLookup(env,"CIN",cins[0],5);
+        mcaRecords = (direct.records || []).map(row=>({
+          name:row.name,identifier:row.identifier,status:row.status,
+          registrationDate:row.registrationDate,source:"MCA Company Master Data",
+          sourceUrl:"https://www.data.gov.in/catalog/company-master-data"
+        }));
+        mcaSearch = {available:!!direct.configured,partial:false,strategy:"ogd_exact_cin_lookup"};
+      }
+    } else if (companyName.length >= 2) {
       const r2 = await searchR2CompanyIndex(env,companyName,8);
       const d1 = (r2.records || []).length ? {records:[]} : await searchNationalCompanyIndex(env,companyName,8);
       const selected = (r2.records || []).length ? r2 : d1;
@@ -706,8 +725,17 @@ async function analyseInternshipUpload(request, env, origin) {
         sourceUrl:"https://www.data.gov.in/catalog/company-master-data"
       }));
       mcaSearch = {available:!!selected.available,partial:!!selected.partial,strategy:selected.strategy || "national_index"};
-    } catch {}
-  }
+      if (!mcaRecords.length && env.DATA_GOV_API_KEY) {
+        const direct = await ogdLookup(env,"CompanyName",companyName,8);
+        mcaRecords = (direct.records || []).map(row=>({
+          name:row.name,identifier:row.identifier,status:row.status,
+          registrationDate:row.registrationDate,source:"MCA Company Master Data",
+          sourceUrl:"https://www.data.gov.in/catalog/company-master-data"
+        }));
+        mcaSearch = {available:!!direct.configured,partial:false,strategy:"ogd_exact_company_name_lookup"};
+      }
+    }
+  } catch {}
 
   const schema = {
     type:"object",
@@ -782,7 +810,7 @@ async function analyseInternshipUpload(request, env, origin) {
 
   const user = JSON.stringify({
     companyName,website,role,recruiterName,recruiterEmail,jobSourceUrl,companyState,companyDistrict,evidence,
-    extractedEmails:emailMatches,extractedUrls:urls,
+    extractedEmails:emailMatches,extractedUrls:urls,extractedCINs:cins,extractedGSTINs:gstins,
     paymentLanguage:paymentLines,mcaRecords,mcaSearch,udyamRecords,udyamSearch,publicDiscovery,
     domainChecks:domainChecks.map(x=>({
       domain:x.domain,emailSecurity:x.emailSecurity,
@@ -860,7 +888,7 @@ async function analyseInternshipUpload(request, env, origin) {
     questionsToAsk:Array.isArray(analysis.questionsToAsk)?analysis.questionsToAsk.slice(0,8):[],
     nextSteps:Array.isArray(analysis.nextSteps)?analysis.nextSteps.slice(0,8):[],
     recruiterProvided:{name:recruiterName,email:recruiterEmail,jobSourceUrl},
-    extracted:{emails:emailMatches,urls,domains,phones:[...new Set(evidence.match(/(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}\b/g)||[])],paymentSignals:paymentLines},
+    extracted:{emails:emailMatches,urls,domains,phones:[...new Set(evidence.match(/(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}\b/g)||[])],cins,gstins,paymentSignals:paymentLines},
     domainChecks,digitalFootprintSearches:searchLinks,
     uploadedEvidence:fileInfo.map(x=>({name:x.name,type:x.type,bytes:x.bytes,processed:true})),
     privacy:{filesPersisted:false,note:"Original files are processed for this request and are not saved by OfferShield. The student may save the resulting summary. Do not upload Aadhaar, PAN, bank details or passwords."},
