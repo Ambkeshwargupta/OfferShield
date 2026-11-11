@@ -29,5 +29,5 @@ jobs:
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
         run: |
           node scripts/mca-download.mjs --max-records=1000 --page-size=1000 --delay-ms=0
-          node -e 'const fs=require("fs"); const p=".data/mca/company-master.ndjson"; const lines=fs.readFileSync(p,"utf8").trim().split(/\r?\n/).filter(Boolean); const bytes=fs.statSync(p).size; console.log(JSON.stringify({sampleRecords:lines.length,bytes,averageBytesPerRecord:Math.round(bytes/Math.max(1,lines.length))},null,2))'
+          node -e 'const fs=require("fs"),zlib=require("zlib"); const p=".data/mca/company-master.ndjson"; const data=fs.readFileSync(p); const lines=data.toString("utf8").trim().split(/\r?\n/).filter(Boolean); const compressed=zlib.gzipSync(data,{level:9}); console.log(JSON.stringify({sampleRecords:lines.length,rawBytes:data.length,gzipBytes:compressed.length,averageRawBytesPerRecord:Math.round(data.length/Math.max(1,lines.length)),estimatedFullDatasetGzipGB:Number((compressed.length/lines.length*3738721/1e9).toFixed(2))},null,2))'
           rm -rf .data
