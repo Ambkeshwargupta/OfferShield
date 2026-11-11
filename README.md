@@ -21,7 +21,7 @@ OfferShield is an India-first company and recruitment due-diligence platform foc
 - Search open-data company candidates through Wikidata.
 - Add a manual investigation for companies not found in structured sources.
 - Display official government and company-owned source links.
-- Paste recruiter conversations and internship descriptions, or upload chat screenshots, offer letters and supporting files (PDF, DOCX, ODT, HTML, XML, PNG, JPG or WEBP).
+- Paste recruiter conversations and internship descriptions, or upload chat screenshots, offer letters and supporting files (PDF, DOCX, XLS/XLSX, ODS/ODT, CSV, HTML, XML, PNG, JPG, WEBP, GIF, BMP or SVG).
 - Use the connected Worker and Workers AI to extract evidence and analyse offer terms, payment requests, recruitment stages, missing details and consistency/risk signals.
 - Display stages mentioned in the student's evidence separately from generic possible stages; never present them as company-confirmed.
 - Save the analysis summary locally in the current browser. Original uploaded file bytes are not included in the saved report.
