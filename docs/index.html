@@ -74,9 +74,26 @@
         </div>
       </div>
 
+      <div class="card" style="margin-top:16px">
+        <div class="eyebrow">03 · Government MSME dataset</div>
+        <h3 style="margin-top:5px">Udyam registered-unit search</h3>
+        <p class="small">Search the Ministry of MSME's published registered-unit list by its mandatory State and District filters. Optionally narrow the current page by enterprise name, activity or pincode.</p>
+        <div class="form-row" style="margin-top:15px">
+          <div class="field"><label for="udyamState">State (required)</label><input id="udyamState" list="udyamStates" placeholder="e.g. Madhya Pradesh"><datalist id="udyamStates"><option>Madhya Pradesh</option><option>Maharashtra</option><option>Uttar Pradesh</option><option>Delhi</option><option>Karnataka</option><option>Gujarat</option><option>Rajasthan</option><option>Tamil Nadu</option><option>Telangana</option><option>West Bengal</option><option>Kerala</option><option>Punjab</option><option>Haryana</option><option>Bihar</option><option>Odisha</option><option>Andhra Pradesh</option><option>Assam</option><option>Chhattisgarh</option><option>Jharkhand</option><option>Uttarakhand</option><option>Himachal Pradesh</option><option>Goa</option><option>Jammu and Kashmir</option><option>Tripura</option><option>Meghalaya</option><option>Manipur</option><option>Nagaland</option><option>Mizoram</option><option>Arunachal Pradesh</option><option>Sikkim</option></datalist><small>Use the spelling shown by the data.gov.in dataset.</small></div>
+          <div class="field"><label for="udyamDistrict">District (required)</label><input id="udyamDistrict" placeholder="e.g. Indore"><small>District is also a mandatory resource filter.</small></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label for="udyamTextQuery">Enterprise name / activity / pincode (optional)</label><input id="udyamTextQuery" placeholder="e.g. engineering or 452001"><small>This narrows only the current API page; use Next page to search more records.</small></div>
+          <div class="field"><label for="udyamPageLimit">Records per page</label><select id="udyamPageLimit"><option value="10">10 records</option><option value="25">25 records</option><option value="50" selected>50 records</option><option value="100">100 records</option></select></div>
+        </div>
+        <div class="form-actions"><button class="btn primary" id="udyamSearchBtn">Search Udyam units →</button><button class="btn" id="udyamResetBtn">Reset</button></div>
+        <div id="udyamResult" style="margin-top:16px"><div class="note">Connect the Cloudflare Worker and configure the data.gov.in API key as a Worker secret to enable this official dataset search.</div></div>
+        <div class="note" style="margin-top:12px"><strong>Important verification limit:</strong> this resource exposes EnterpriseName, State, District, Pincode, RegistrationDate, CommunicationAddress and Activities, but no Udyam Registration Number. It supports location-based enterprise discovery and name comparison; it cannot validate a specific Udyam certificate or number.</div>
+      </div>
+
       <div class="grid two" style="margin-top:16px">
         <div class="card">
-          <div class="eyebrow">03 · Original email investigation</div><h3 style="margin-top:5px">Analyse raw email headers</h3>
+          <div class="eyebrow">04 · Original email investigation</div><h3 style="margin-top:5px">Analyse raw email headers</h3>
           <p class="small">Paste the original raw headers from your mailbox to inspect From, Reply-To, Return-Path and reported SPF/DKIM/DMARC results.</p>
           <div class="field" style="margin-top:15px"><label for="expectedRecruitmentDomain">Company-published recruitment domain (optional)</label><input id="expectedRecruitmentDomain" placeholder="e.g. company.com"></div>
           <div class="note" style="margin-bottom:10px">Privacy: when the Cloudflare Worker is connected, pasted raw headers are sent to that Worker for parsing and are not intentionally stored. Redact personal details and only use a Worker deployment you control.</div>
@@ -381,6 +398,37 @@ function renderDomainReport(data){
  const events=(registration?.events||[]).map(x=>'<div class="detail-row"><span>'+esc(x.action)+'</span><b>'+esc(x.date)+'</b></div>').join("");
  $("#domainResult").innerHTML='<div class="card"><div class="result-head"><div><h3>'+esc(data.domain)+'</h3><p class="small">Technical domain observations · '+esc(new Date(data.checkedAt||Date.now()).toLocaleString())+'</p></div><span class="tag">No authenticity verdict</span></div><div class="section-title"><h2>DNS records</h2></div><div class="detail-list">'+recordRows+'</div><div class="section-title"><h2>Email security signals</h2></div><div class="detail-list">'+statusRows+'</div>'+(email.spfRecord?'<div class="note">SPF: '+esc(email.spfRecord)+'</div>':'')+(email.dmarcRecord?'<div class="note" style="margin-top:7px">DMARC: '+esc(email.dmarcRecord)+'</div>':'')+'<div class="section-title"><h2>Public domain registration (RDAP)</h2></div><div class="detail-list">'+(registration?'<div class="detail-row"><span>RDAP name</span><b>'+esc(registration.ldhName||registration.name||data.domain)+'</b></div>'+events:'<div class="note">RDAP data unavailable for this lookup.</div>')+'</div><div class="note" style="margin-top:15px">'+(data.limitations||[]).map(esc).join("<br>")+'</div></div>';
 }
+let udyamOffset=0;
+let lastUdyamQuery={state:"",district:"",query:"",limit:50};
+function renderUdyamResults(data){
+ if(data.error){
+  $("#udyamResult").innerHTML='<div class="note"><strong>Udyam search unavailable:</strong> '+esc(data.error.message||data.error.code)+'</div>';
+  return;
+ }
+ const records=data.records||[];
+ const total=Number(data.total||0),limit=Number(data.limit||50),offset=Number(data.offset||0),pageCount=Number(data.pageRecordCount??records.length);
+ const recordHtml=records.map((r,index)=>'<article class="source-card" style="margin-top:10px"><div class="result-head"><div><h3>'+esc(r.enterpriseName||"Enterprise name not supplied")+'</h3><p class="small">'+esc(r.activities||"Activity not supplied")+'</p></div><span class="tag official">Government dataset record</span></div><div class="detail-list"><div class="detail-row"><span>State / District</span><b>'+esc(r.state||data.state)+' / '+esc(r.district||data.district)+'</b></div><div class="detail-row"><span>Pincode</span><b>'+esc(r.pincode||"Not supplied")+'</b></div><div class="detail-row"><span>Registration date</span><b>'+esc(r.registrationDate||"Not supplied")+'</b></div></div>'+(r.communicationAddress?'<details style="margin-top:8px"><summary class="small" style="cursor:pointer;font-weight:650">View published communication address</summary><p class="small muted" style="margin-top:6px">'+esc(r.communicationAddress)+'</p></details>':"")+'<div class="small muted" style="margin-top:8px">Source: Ministry of MSME · data.gov.in</div></article>').join("");
+ const hasMore=pageCount>=limit || (total>0 && offset+pageCount<total);
+ const pageInfo='Showing '+(pageCount?offset+1:0)+'–'+(offset+pageCount)+' of '+(total||"an unspecified number of")+' records for '+esc(data.state)+', '+esc(data.district)+'.';
+ $("#udyamResult").innerHTML='<div class="result-head"><div><h3>Udyam dataset results</h3><p class="small muted">'+pageInfo+'</p><p class="small muted">'+Number(data.matchedInPage??records.length)+' record(s) match the optional text filter on this page.</p></div><span class="tag official">data.gov.in · official dataset</span></div>'+(records.length?recordHtml:'<div class="empty" style="margin-top:12px"><b>No matching unit on this page</b>Check exact State/District spelling, clear the optional text filter, or browse the next page. An empty page is not proof that a business is unregistered.</div>')+'<div class="quick" style="margin-top:14px"><button class="btn" id="udyamPrevPage" '+(offset===0?'disabled':'')+'>← Previous page</button><button class="btn primary" id="udyamNextPage" '+(!hasMore?'disabled':'')+'>Next page →</button><a class="btn" href="'+esc(data.sourceUrl||"https://www.data.gov.in/resource/list-msme-registered-units-under-udyam")+'" target="_blank" rel="noopener noreferrer">Open source dataset ↗</a></div><div class="note" style="margin-top:12px">'+(data.limitations||[]).map(esc).join("<br>")+'</div>';
+ $("#udyamPrevPage").onclick=()=>{udyamOffset=Math.max(0,offset-limit);runUdyamSearch(true)};
+ $("#udyamNextPage").onclick=()=>{udyamOffset=offset+limit;runUdyamSearch(true)};
+}
+async function runUdyamSearch(preserveOffset=false){
+ const state=$("#udyamState").value.trim(),district=$("#udyamDistrict").value.trim(),query=$("#udyamTextQuery").value.trim(),limit=Number($("#udyamPageLimit").value||50);
+ if(!state||!district){toast("Udyam search requires both State and District.");return}
+ if(!workerApiBase()){toast("Connect the Cloudflare Worker first. The data.gov.in API key must stay in the Worker secret store.");$("#udyamResult").innerHTML='<div class="note">No Worker is connected. Add your deployed Worker URL above, then click Test. Do not paste the data.gov.in API key into this website.</div>';return}
+ if(!preserveOffset)udyamOffset=0;
+ lastUdyamQuery={state,district,query,limit};
+ $("#udyamResult").innerHTML='<div class="loading">Querying the Udyam registered-units dataset for '+esc(state)+', '+esc(district)+'…</div>';
+ $("#udyamSearchBtn").disabled=true;
+ try{
+  const params=new URLSearchParams({state,district,q:query,limit:String(limit),offset:String(udyamOffset)});
+  const data=await workerRequest("/v1/udyam/search?"+params.toString());
+  renderUdyamResults(data);
+ }catch(error){$("#udyamResult").innerHTML='<div class="note">Udyam dataset request failed: '+esc(error.message)+'. Check your Worker URL, API-key secret and exact State/District values.</div>'}
+ finally{$("#udyamSearchBtn").disabled=false}
+}
 async function runDomainCheck(){
  const raw=$("#advancedDomain").value.trim();if(!raw){toast("Enter a website domain or email address.");return}
  $("#domainResult").innerHTML='<div class="loading">Checking public DNS and RDAP records…</div>';
@@ -511,6 +559,10 @@ $("#advancedSearchBtn").onclick=runAdvancedSearch;
 $("#advancedQuery").addEventListener("keydown",e=>{if(e.key==="Enter")runAdvancedSearch()});
 $("#advancedClearBtn").onclick=()=>{$("#advancedQuery").value="";$("#advancedSearchResult").innerHTML='<div class="empty"><b>Start with any company identifier</b>Official registry data is distinguished from community discovery results.</div>'};
 $("#domainCheckBtn").onclick=runDomainCheck;
+$("#udyamSearchBtn").onclick=runUdyamSearch;
+$("#udyamResetBtn").onclick=()=>{udyamOffset=0;$("#udyamState").value="";$("#udyamDistrict").value="";$("#udyamTextQuery").value="";$("#udyamResult").innerHTML='<div class="note">Enter the mandatory State and District filters to search the MSME registered-unit dataset.</div>'};
+$("#udyamState").addEventListener("keydown",e=>{if(e.key==="Enter")runUdyamSearch()});
+$("#udyamDistrict").addEventListener("keydown",e=>{if(e.key==="Enter")runUdyamSearch()});
 $("#advancedDomain").addEventListener("keydown",e=>{if(e.key==="Enter")runDomainCheck()});
 $("#headerCheckBtn").onclick=runHeaderCheck;
 $("#recruiterCheckBtn").onclick=buildRecruiterChecks;
