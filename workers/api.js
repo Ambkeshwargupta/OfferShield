@@ -854,7 +854,7 @@ async function tavilySearch(env, query, topic = "general") {
       method:"POST",
       signal:controller.signal,
       headers:{"content-type":"application/json","authorization":"Bearer "+env.TAVILY_API_KEY},
-      body:JSON.stringify({query,search_depth:"basic",topic,max_results:5,country:"India",include_answer:false,include_raw_content:false,include_usage:true})
+      body:JSON.stringify({query,search_depth:"basic",topic,max_results:5,country:topic==="general"?"india":undefined,include_answer:false,include_raw_content:false,include_usage:true})
     });
     if (!upstream.ok) return {configured:true,results:[],error:upstream.status===401?"The web-search API key was rejected. Check TAVILY_API_KEY.":upstream.status===429?"The web-search provider rate/credit limit was reached.":"The web-search provider could not complete this query.",status:upstream.status};
     const payload = await upstream.json();
