@@ -634,6 +634,147 @@ function compactOfferMca(row = {}) {
   };
 }
 
+
+// Community Recruitment Intelligence stores only opt-in structured experience data.
+// Raw messages, screenshots, recruiter names, emails, phone numbers and free text are never accepted.
+const COMMUNITY_MIN_PUBLIC_REPORTS = 3;
+const COMMUNITY_ENUMS = {
+  opportunityType:["internship","fresher_job","apprenticeship","other"],
+  roleCategory:["software_it","data_ai","design_creative","marketing_sales","finance_business","operations_hr","engineering_core","other"],
+  workMode:["remote","hybrid","onsite","not_stated"],
+  stipendBand:["unpaid","under_5000","5000_10000","10000_20000","above_20000","not_stated"],
+  durationBand:["under_1_month","1_3_months","3_6_months","above_6_months","not_stated"],
+  paymentRequest:["yes","no","unsure"],
+  outcome:["applied","assessment","interviewed","offer_received","joined","withdrew","no_response"]
+};
+const COMMUNITY_STAGES = new Set([
+  "application_form","aptitude_test","assignment","technical_interview","hr_interview",
+  "manager_interview","group_discussion","written_offer","background_check","other"
+]);
+function communityCompanyKey(value) {
+  return cleanText(value,180).toLowerCase().normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"")
+    .replace(/\\b(private limited|pvt\\.? ltd\\.?|limited|ltd\\.?|llp|incorporated|inc\\.?)\\b/g," ")
+    .replace(/[^a-z0-9]+/g," ").trim().replace(/\\s+/g," ").slice(0,180);
+}
+function randomCommunityToken() {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+function enumValue(value, allowed, fallback) {
+  const candidate = cleanText(value,40).trim().toLowerCase();
+  return allowed.includes(candidate) ? candidate : fallback;
+}
+async function communitySubmissionRateLimit(request, env) {
+  if (!env.DB) return false;
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const key = await sha256(ip + "|offershield-community-submit");
+  const bucket = Math.floor(Date.now()/3600000);
+  await env.DB.prepare("INSERT INTO rate_limits (key,bucket,count) VALUES (?, ?, 1) ON CONFLICT(key,bucket) DO UPDATE SET count=count+1").bind(key,bucket).run();
+  const row = await env.DB.prepare("SELECT count FROM rate_limits WHERE key=? AND bucket=?").bind(key,bucket).first();
+  return (row?.count || 0) <= 3;
+}
+async function getCommunityRecruitmentInsights(env, companyName, websiteOrDomain) {
+  const companyKey = communityCompanyKey(companyName);
+  const domain = normalizeDomain(websiteOrDomain);
+  if (!env.DB) return {available:false,configured:false,thresholdMet:false,minReports:COMMUNITY_MIN_PUBLIC_REPORTS,reportCount:0,note:"Community intelligence requires the optional Cloudflare D1 database binding."};
+  if (!companyKey && !domain) return {available:true,configured:true,thresholdMet:false,minReports:COMMUNITY_MIN_PUBLIC_REPORTS,reportCount:0,note:"Enter a company name or website domain to look for moderated community patterns."};
+  try {
+    const since = new Date(Date.now()-365*86400000).toISOString();
+    const rows = await env.DB.prepare(
+      "SELECT stipend_band,duration_band,work_mode,payment_request,outcome,recruitment_stages_json FROM community_reports WHERE moderation_status='approved' AND created_at>=? AND (company_key=? OR (?<>'' AND company_domain=?)) ORDER BY created_at DESC LIMIT 300"
+    ).bind(since,companyKey,domain||"",domain||"").all();
+    const reports = rows.results || [];
+    if (reports.length < COMMUNITY_MIN_PUBLIC_REPORTS) {
+      return {available:true,configured:true,thresholdMet:false,minReports:COMMUNITY_MIN_PUBLIC_REPORTS,reportCount:reports.length,windowDays:365,note:"Not enough approved contributions to show a pattern yet. Individual submissions remain private and pending reports are never shown or used by the AI."};
+    }
+    const countBy = (values) => {
+      const counts = new Map();
+      for (const value of values) if (value) counts.set(value,(counts.get(value)||0)+1);
+      return [...counts.entries()].map(([value,count])=>({value,count})).sort((a,b)=>b.count-a.count);
+    };
+    const stageValues = [];
+    for (const row of reports) {
+      try {
+        const stages = JSON.parse(row.recruitment_stages_json || "[]");
+        if (Array.isArray(stages)) stageValues.push(...stages.filter(x=>COMMUNITY_STAGES.has(x)));
+      } catch {}
+    }
+    const yes = reports.filter(x=>x.payment_request==="yes").length;
+    const unsure = reports.filter(x=>x.payment_request==="unsure").length;
+    return {
+      available:true,configured:true,thresholdMet:true,minReports:COMMUNITY_MIN_PUBLIC_REPORTS,
+      reportCount:reports.length,windowDays:365,
+      stages:countBy(stageValues).slice(0,8),
+      stipendBands:countBy(reports.map(x=>x.stipend_band)).slice(0,6),
+      durationBands:countBy(reports.map(x=>x.duration_band)).slice(0,5),
+      workModes:countBy(reports.map(x=>x.work_mode)).slice(0,4),
+      outcomes:countBy(reports.map(x=>x.outcome)).slice(0,7),
+      paymentRequests:{reportedYes:yes,reportedUnsure:unsure,total:reports.length},
+      note:"Aggregated from opt-in, self-reported contributions approved by moderation. This is not company-confirmed hiring policy or proof of misconduct; experiences may vary by role, team and date."
+    };
+  } catch {
+    return {available:false,configured:true,thresholdMet:false,minReports:COMMUNITY_MIN_PUBLIC_REPORTS,reportCount:0,note:"The community intelligence database could not be queried right now."};
+  }
+}
+async function submitCommunityRecruitmentReport(request, env, origin) {
+  if (!env.DB) return jsonError("Community intelligence is not enabled yet. Bind and initialise the Cloudflare D1 database first.",503,origin,"community_database_not_configured");
+  const length = Number(request.headers.get("content-length") || 0);
+  if (length > 5000) return jsonError("This form accepts structured fields only; do not send messages, files or free-text notes.",413,origin,"community_payload_too_large");
+  let body;
+  try { body = await request.json(); } catch { return jsonError("Send a valid JSON report.",400,origin,"invalid_json"); }
+  if (!body || body.consent !== true || body.selfReport !== true) return jsonError("Confirm that this is your own experience and consent to anonymised, moderated community use.",400,origin,"community_consent_required");
+  if (body.consentVersion !== "community-v1") return jsonError("Please refresh the form and accept the current community consent wording.",400,origin,"community_consent_version");
+  const companyName = cleanText(body.companyName,180).trim();
+  const companyKey = communityCompanyKey(companyName);
+  if (!companyName || companyKey.length < 2) return jsonError("Enter the company or startup name.",400,origin,"company_name_required");
+  const rawWebsite = cleanText(body.website,240).trim();
+  const companyDomain = rawWebsite ? normalizeDomain(rawWebsite) : null;
+  if (rawWebsite && !companyDomain) return jsonError("Enter a valid public company website domain, or leave it blank.",400,origin,"invalid_company_domain");
+  const stages = Array.isArray(body.stages) ? [...new Set(body.stages.filter(x=>typeof x==="string" && COMMUNITY_STAGES.has(x)))] : [];
+  if (stages.length > 10) return jsonError("Select no more than ten recruitment stages.",400,origin,"too_many_stages");
+  if (!await communitySubmissionRateLimit(request,env)) return jsonError("Community contribution limit reached for this network. Please try again later.",429,origin,"community_rate_limited");
+  const reportId = crypto.randomUUID();
+  const deletionToken = randomCommunityToken();
+  const tokenHash = await sha256(deletionToken);
+  const createdAt = new Date().toISOString();
+  const fields = {
+    opportunityType:enumValue(body.opportunityType,COMMUNITY_ENUMS.opportunityType,"other"),
+    roleCategory:enumValue(body.roleCategory,COMMUNITY_ENUMS.roleCategory,"other"),
+    state:cleanText(body.state,60).trim().replace(/[^a-zA-Z .'-]/g,""),
+    workMode:enumValue(body.workMode,COMMUNITY_ENUMS.workMode,"not_stated"),
+    stipendBand:enumValue(body.stipendBand,COMMUNITY_ENUMS.stipendBand,"not_stated"),
+    durationBand:enumValue(body.durationBand,COMMUNITY_ENUMS.durationBand,"not_stated"),
+    paymentRequest:enumValue(body.paymentRequest,COMMUNITY_ENUMS.paymentRequest,"unsure"),
+    outcome:enumValue(body.outcome,COMMUNITY_ENUMS.outcome,"no_response")
+  };
+  try {
+    await env.DB.prepare(
+      "INSERT INTO community_reports (id,company_name,company_key,company_domain,opportunity_type,role_category,state,work_mode,stipend_band,duration_band,payment_request,outcome,recruitment_stages_json,moderation_status,consent_version,deletion_token_hash,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','community-v1',?,?)"
+    ).bind(reportId,companyName,companyKey,companyDomain,fields.opportunityType,fields.roleCategory,fields.state,fields.workMode,fields.stipendBand,fields.durationBand,fields.paymentRequest,fields.outcome,JSON.stringify(stages),tokenHash,createdAt).run();
+  } catch {
+    return jsonError("The community report could not be saved. Check the D1 community schema migration and retry.",503,origin,"community_write_failed");
+  }
+  return response({
+    submitted:true,status:"pending_moderation",reportId,deletionToken,
+    note:"Your structured report is queued for moderation. It is not public and is not used by the AI until approved. Save the deletion token now; OfferShield cannot recover it later."
+  },201,origin);
+}
+async function deleteCommunityRecruitmentReport(request, env, reportId, origin) {
+  if (!env.DB) return jsonError("Community intelligence database is not connected.",503,origin,"community_database_not_configured");
+  let body;
+  try { body = await request.json(); } catch { return jsonError("Provide the deletion token returned when you submitted the report.",400,origin,"deletion_token_required"); }
+  const token = cleanText(body?.deletionToken,100).trim();
+  if (!/^[a-f0-9]{48}$/.test(token)) return jsonError("The deletion token is invalid.",400,origin,"invalid_deletion_token");
+  try {
+    const result = await env.DB.prepare("DELETE FROM community_reports WHERE id=? AND deletion_token_hash=?").bind(reportId,await sha256(token)).run();
+    if (!(result.meta?.changes > 0)) return jsonError("No report matched that ID and deletion token.",404,origin,"community_report_not_found");
+    return response({deleted:true,note:"Your community contribution has been deleted."},200,origin);
+  } catch {
+    return jsonError("The community report could not be deleted. Please retry.",503,origin,"community_delete_failed");
+  }
+}
+
 async function analyseInternshipUpload(request, env, origin) {
   if (!env.AI || typeof env.AI.run !== "function" || typeof env.AI.toMarkdown !== "function") {
     return jsonError("Workers AI is not enabled. Add the AI binding in Cloudflare and redeploy this Worker.",503,origin,"ai_not_enabled");
@@ -796,6 +937,7 @@ async function analyseInternshipUpload(request, env, origin) {
     "You may list common possible internship stages (application review, assignment, technical or role interview, HR/stipend discussion, written offer) only under typicalPossibleStages and clearly label them generic, not this company's confirmed process.",
     "Identify payment requests, deposits, unrealistic stipends, pressure tactics, unusual links, generic email services, vague responsibilities and missing written terms. Context matters; one signal alone is not proof of fraud.",
     "Pasted email headers are unverified text. SPF/DKIM/DMARC strings parsed from Authentication-Results are claims in the submitted header, not cryptographic verification by OfferShield; original mailbox headers may be altered before submission.",
+    "Community Recruitment Intelligence, when supplied, is opt-in, structured, anonymised, self-reported and approved by moderation. It is aggregated only after at least three reports; it is not company-confirmed hiring policy and not proof of misconduct. Treat it as weak corroborative context, mention its sample count/window, and never repeat personal data or frame a pattern as a verified accusation.",
     "Use only the supplied MCA, Udyam, Wikidata-candidate and domain data. Do not claim you browsed websites, LinkedIn, reviews or job boards. Keep advice practical and student-friendly."
   ].join(" ");
   let udyamRecords = [];
@@ -864,11 +1006,13 @@ async function analyseInternshipUpload(request, env, origin) {
     }
   }
 
+  const communityIntelligence = await getCommunityRecruitmentInsights(env,companyName,website);
   const user = JSON.stringify({
     companyName,website,role,recruiterName,recruiterEmail,jobSourceUrl,companyState,companyDistrict,evidence,
     extractedEmails:emailMatches,extractedUrls:urls,extractedCINs:cins,extractedGSTINs:gstins,
     emailHeaderAnalysis,emailDomainComparison,
     paymentLanguage:paymentLines,mcaRecords,mcaSearch,udyamRecords,udyamSearch,publicDiscovery,officialPublicContacts,
+    communityIntelligence,
     domainChecks:domainChecks.map(x=>({
       domain:x.domain,emailSecurity:x.emailSecurity,
       registration:x.registration ? {ldhName:x.registration.ldhName,status:x.registration.status,events:x.registration.events,registrar:x.registration.registrar} : null
@@ -938,6 +1082,7 @@ async function analyseInternshipUpload(request, env, origin) {
     riskLevel:["high","elevated","moderate","unknown"].includes(analysis.riskLevel) ? analysis.riskLevel : "unknown",
     headline:cleanText(analysis.headline,160),summary:cleanText(analysis.summary,1400),
     company:{claimedName:company,mcaMatches:mcaRecords,mcaSearch,udyamMatches:udyamRecords,udyamSearch,publicDiscovery,officialPublicContacts},
+    communityIntelligence,
     offer:{role:roleName,stipend:cleanText(analysis.stipend,120),duration:cleanText(analysis.duration,120),workModeAndLocation:cleanText(analysis.workModeAndLocation,180)},
     recruitmentStages:{
       explicitStages:Array.isArray(analysis.explicitRecruitmentStages)?analysis.explicitRecruitmentStages.slice(0,10):[],
@@ -975,11 +1120,27 @@ async function route(request, env) {
   if (origin === null) return jsonError("Origin not allowed.", 403, "null", "origin_not_allowed");
   if (request.method === "OPTIONS") return new Response(null, { status:204, headers:{"access-control-allow-origin":origin,"access-control-allow-methods":"GET,POST,OPTIONS","access-control-allow-headers":"content-type","access-control-max-age":"86400","vary":"Origin"} });
   const url = new URL(request.url);
-  if (url.pathname === "/health" || url.pathname === "/v1/health") return response({ ok:true, service:"OfferShield Intelligence API", version:"1.1.0", officialOgdConfigured:!!env.DATA_GOV_API_KEY, d1Configured:!!env.DB, companyIndexConfigured:!!env.COMPANY_INDEX, aiConfigured:!!env.AI, documentConversionConfigured:!!(env.AI && typeof env.AI.toMarkdown === "function"), checkedAt:new Date().toISOString() },200,origin);
+  if (url.pathname === "/health" || url.pathname === "/v1/health") return response({ ok:true, service:"OfferShield Intelligence API", version:"1.2.0", officialOgdConfigured:!!env.DATA_GOV_API_KEY, d1Configured:!!env.DB, communityIntelligenceConfigured:!!env.DB, companyIndexConfigured:!!env.COMPANY_INDEX, aiConfigured:!!env.AI, documentConversionConfigured:!!(env.AI && typeof env.AI.toMarkdown === "function"), checkedAt:new Date().toISOString() },200,origin);
   if (!url.pathname.startsWith("/v1/")) return jsonError("Route not found.",404,origin,"not_found");
   if (!await rateLimit(request,env)) return jsonError("Rate limit reached. Please retry in one minute.",429,origin,"rate_limited");
   if (request.method === "POST" && url.pathname === "/v1/investigate") {
     return analyseInternshipUpload(request,env,origin);
+  }
+  if (request.method === "POST" && url.pathname === "/v1/community/reports") {
+    return submitCommunityRecruitmentReport(request,env,origin);
+  }
+  if (request.method === "GET" && url.pathname === "/v1/community/insights") {
+    if (!env.DB) return jsonError("Community intelligence requires the D1 database binding.",503,origin,"community_database_not_configured");
+    const companyName = cleanText(url.searchParams.get("companyName"),180).trim();
+    const website = cleanText(url.searchParams.get("website"),240).trim();
+    if (!companyName && !website) return jsonError("Enter a company name or website domain.",400,origin,"community_company_required");
+    if (website && !normalizeDomain(website)) return jsonError("Enter a valid public website domain.",400,origin,"invalid_company_domain");
+    return response({companyName,website,insights:await getCommunityRecruitmentInsights(env,companyName,website)},200,origin);
+  }
+  if (request.method === "DELETE" && url.pathname.startsWith("/v1/community/reports/")) {
+    const reportId = cleanText(decodeURIComponent(url.pathname.split("/").pop() || ""),80).trim();
+    if (!/^[a-f0-9-]{36}$/i.test(reportId)) return jsonError("Invalid community report ID.",400,origin,"invalid_report_id");
+    return deleteCommunityRecruitmentReport(request,env,reportId,origin);
   }
   if (request.method === "GET" && url.pathname === "/v1/search") {
     const query = cleanText(url.searchParams.get("q"),120).trim();
