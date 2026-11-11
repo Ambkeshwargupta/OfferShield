@@ -248,11 +248,91 @@ async function wikidataSearch(query) {
     }));
   } catch { return []; }
 }
+const COMPANY_NAME_STOP_WORDS = new Set([
+  "private","limited","ltd","pvt","llp","opc","one","person","company","co",
+  "the","and","of","for","at","by","in","on","a","an"
+]);
+
 function companyIndexQuery(query) {
   const tokens = String(query || "").toLowerCase()
     .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
     .match(/[a-z0-9]+/g) || [];
-  return [...new Set(tokens)].filter(token => token.length >= 2).slice(0, 6);
+  return [...new Set(tokens)].filter(token => token.length >= 3 && !COMPANY_NAME_STOP_WORDS.has(token)).slice(0, 6);
+}
+
+async function searchR2CompanyIndex(env, query, limit = 12) {
+  if (!env.COMPANY_INDEX) return { configured:false, available:false, records:[], strategy:"r2_not_configured" };
+  const identifier = classifyIdentifier(query);
+  if (identifier.type !== "Company name") return { configured:true, available:false, records:[], strategy:"r2_name_index_only" };
+  const tokens = companyIndexQuery(query);
+  if (!tokens.length) return { configured:true, available:true, records:[], strategy:"r2_no_searchable_tokens", partial:false };
+  const tokenSets = [];
+  let partial = false;
+  let scannedShards = 0;
+  try {
+    for (const token of tokens) {
+      const prefix = "mca/term/" + token.slice(0, Math.min(5, token.length));
+      const listedTerms = await env.COMPANY_INDEX.list({ prefix, limit:1000 });
+      if (listedTerms.truncated) partial = true;
+      const allTerms = [...new Set((listedTerms.objects || [])
+        .map(item => String(item.key || "").split("/")[2])
+        .filter(term => term && term.startsWith(token)))];
+      allTerms.sort((a,b) => a === token ? -1 : b === token ? 1 : a.localeCompare(b));
+      const chosenTerms = allTerms.slice(0, 8);
+      if (allTerms.length > chosenTerms.length) partial = true;
+      const matches = new Map();
+      for (const term of chosenTerms) {
+        const partListing = await env.COMPANY_INDEX.list({ prefix:"mca/term/" + term + "/", limit:10 });
+        if (partListing.truncated) partial = true;
+        const parts = (partListing.objects || []).slice(0, 5);
+        if ((partListing.objects || []).length > parts.length) partial = true;
+        for (const part of parts) {
+          const object = await env.COMPANY_INDEX.get(part.key);
+          if (!object?.body) continue;
+          const decompressed = object.body.pipeThrough(new DecompressionStream("gzip"));
+          const contents = await new Response(decompressed).text();
+          scannedShards++;
+          for (const line of contents.split(/\r?\n/)) {
+            if (!line) continue;
+            let row;
+            try { row = JSON.parse(line); } catch { continue; }
+            const nameTokens = String(row.k || "").split(" ");
+            if (!nameTokens.some(word => word.startsWith(token))) continue;
+            if (row.i) matches.set(String(row.i), row);
+          }
+        }
+      }
+      tokenSets.push(matches);
+      if (!matches.size) break;
+    }
+    let records = [];
+    if (tokenSets.length === tokens.length && tokenSets.every(set => set.size)) {
+      const first = tokenSets[0];
+      const queryNorm = tokens.join(" ");
+      records = [...first.entries()]
+        .filter(([identifier]) => tokenSets.every(set => set.has(identifier)))
+        .map(([,row]) => ({
+          identifier:row.i, name:row.n, status:row.s, state:row.t,
+          registrationDate:row.d, class:row.c, roc:row.r,
+          source:"MCA Company Master Data (R2 token index)",
+          sourceUrl:"https://www.data.gov.in/catalog/company-master-data",
+          matchScore:String(row.k || "").startsWith(queryNorm) ? 1 : tokens.length > 1 ? 0.96 : 0.9
+        }))
+        .sort((a,b) => b.matchScore - a.matchScore || String(a.name).localeCompare(String(b.name)))
+        .slice(0, limit);
+    }
+    return {
+      configured:true, available:true, records, strategy:"r2_token_prefix_postings",
+      partial, scannedShards, indexedTokens:tokens.length,
+      message:partial ? "Some broad token partitions were capped for response time. Refine the company name for a narrower search." : null
+    };
+  } catch (error) {
+    return {
+      configured:true, available:false, records:[],
+      strategy:"r2_index_unavailable",
+      message:"The R2 company index could not be queried. Confirm the COMPANY_INDEX binding and that the national index upload is complete."
+    };
+  }
 }
 
 async function searchNationalCompanyIndex(env, query, limit = 12) {
@@ -414,7 +494,8 @@ async function route(request, env) {
   if (request.method === "GET" && url.pathname === "/v1/search") {
     const query = cleanText(url.searchParams.get("q"),120).trim();
     if (query.length < 2) return jsonError("Enter at least two characters.",400,origin);
-    const indexed = await searchNationalCompanyIndex(env, query, 12);
+    const r2Indexed = await searchR2CompanyIndex(env, query, 12);
+    const indexed = r2Indexed.available ? r2Indexed : await searchNationalCompanyIndex(env, query, 12);
     const result = await resolveSearch(query,env);
     if (indexed.records.length) {
       const merged = new Map();
@@ -431,6 +512,8 @@ async function route(request, env) {
       available:indexed.available,
       indexedMatches:indexed.records.length,
       strategy:indexed.strategy,
+      partial:!!indexed.partial,
+      scannedShards:indexed.scannedShards || 0,
       message:indexed.message || null
     };
     return response(result,200,origin);
@@ -484,6 +567,7 @@ async function route(request, env) {
       capabilities:[
         {id:"mca_ogd",name:"MCA company master data via data.gov.in",configured:!!env.DATA_GOV_API_KEY,mode:env.DATA_GOV_API_KEY?"Live API connector":"Requires free data.gov.in API key",coverage:"Company/LLP master snapshot; not live MCA portal data"},
         {id:"mca_national_index",name:"National MCA full-text company index",configured:!!env.DB,mode:env.DB?"Requires 0002 migration and bulk data import":"Requires D1 binding, migration and bulk data import",coverage:"Searches imported MCA company master data locally using FTS5; coverage is limited to the snapshot actually imported"},
+        {id:"mca_r2_index",name:"National MCA token index in Cloudflare R2",configured:!!env.COMPANY_INDEX,mode:env.COMPANY_INDEX?"R2 bucket bound; requires national index upload":"Requires an R2 bucket binding and national index upload",coverage:"Searches imported MCA company and LLP names through token-prefix shards; only imported snapshot records are covered"},
         {id:"udyam_ogd",name:"MSME registered units under UDYAM via data.gov.in",configured:!!env.DATA_GOV_API_KEY,mode:env.DATA_GOV_API_KEY?"Live API connector; State and District required":"Requires DATA_GOV_API_KEY secret",coverage:"EnterpriseName, State, District, Pincode, RegistrationDate, CommunicationAddress and Activities. Udyam Registration Number is not exposed by this resource."},
         {id:"wikidata",name:"Wikidata company discovery",configured:true,mode:"Public API",coverage:"Third-party discovery candidates only"},
         {id:"dns",name:"DNS email and domain checks",configured:true,mode:"Google Public DNS-over-HTTPS",coverage:"A, AAAA, MX, TXT, NS and DMARC TXT records"},
