@@ -208,6 +208,7 @@ async function udyamLookup(env, stateValue, districtValue, searchValue = "", lim
       source:"Ministry of Micro, Small and Medium Enterprises via data.gov.in",
       sourceUrl:UDYAM_SOURCE_URL,
       retrievedAt:new Date().toISOString(),
+      availableFields:["LG_ST_Code","State","LG_DT_Code","District","Pincode","RegistrationDate","EnterpriseName","CommunicationAddress","Activities"],
       registrationNumberAvailable:false,
       limitations:[
         "The resource fields exposed in the catalogue do not include a Udyam Registration Number. This dataset cannot authenticate an individual Udyam number or certificate.",
