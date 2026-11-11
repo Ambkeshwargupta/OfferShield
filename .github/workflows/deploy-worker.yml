@@ -10,11 +10,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
-      - name: Check required secrets
+          node-version: 24
+          package-manager-cache: false
+      - name: Validate deployment credentials
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -22,11 +23,40 @@ jobs:
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
         run: |
           set -euo pipefail
+          missing=()
           for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID DATA_GOV_API_KEY; do
-            if [ -z "${!name:-}" ]; then echo "Missing required GitHub Actions secret: $name"; exit 1; fi
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
           done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Add the following repository Actions secrets before deployment: ${missing[*]}"
+            echo "Open https://github.com/Ambkeshwargupta/OfferShield/settings/secrets/actions"
+            echo "CLOUDFLARE_API_TOKEN: Cloudflare account API token with Workers Scripts Edit permission (and R2 permissions for the configured R2 binding)."
+            echo "CLOUDFLARE_ACCOUNT_ID: Cloudflare account ID."
+            echo "DATA_GOV_API_KEY: data.gov.in API key."
+            exit 1
+          fi
+          echo "All required deployment secrets are present (values are not printed)."
       - name: Install Wrangler
-        run: npm install --global wrangler
+        run: npm install --global wrangler@latest
+      - name: Verify Cloudflare authentication
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: wrangler whoami
+      - name: Verify configured R2 bucket
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          buckets="$(wrangler r2 bucket list)"
+          if ! printf '%s\n' "$buckets" | grep -Fq "offershield-company-index"; then
+            echo "::error::R2 bucket offershield-company-index was not found. Create it in Cloudflare R2 before deploying."
+            echo "https://dash.cloudflare.com/?to=/:account/r2"
+            exit 1
+          fi
+          echo "National MCA index R2 bucket is present."
       - name: Set MCA API key as Worker secret
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
