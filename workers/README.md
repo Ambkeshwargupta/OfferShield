@@ -107,7 +107,7 @@ Tavily uses a separate search index/API. It is not Google Search and does not sc
 
 Tavily's current Researcher plan lists 1,000 API credits per month without a credit card; one basic search query uses one credit. Advanced or extraction options can use more credits. Tavily separately advertises a free-for-students offer; eligibility and terms are controlled by Tavily. Keep the number of search queries per investigation capped and monitor the Tavily usage dashboard. See https://www.tavily.com/pricing.
 
-The default implementation uses four basic company queries and a fifth optional recruiter-name query. Results are cached for 12 hours. If the key is absent or credits are exhausted, OfferShield shows a clear coverage message and keeps manual search links available; it must not invent footprint findings.
+The default implementation uses five basic company queries (website, LinkedIn page, history/news, ecosystem partners and hiring/reviews) and a sixth optional recruiter-name query. Results are cached for 12 hours. If the key is absent or credits are exhausted, OfferShield shows a clear coverage message and keeps manual search links available; it must not invent footprint findings.
 
 ## Community Recruitment Intelligence (D1 required)
 
