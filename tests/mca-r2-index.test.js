@@ -37,9 +37,15 @@ test("MCA R2 index builder creates compact token-partitioned gzip postings",asyn
     ],{encoding:"utf8"});
     assert.equal(result.status,0,result.stderr || result.stdout);
     const manifest=JSON.parse(await readFile(path.join(output,"index-manifest.json"),"utf8"));
+    assert.equal(manifest.version,2);
     assert.equal(manifest.importedCompanies,2);
     assert.equal(manifest.tokenPostings,4);
+    assert.equal(manifest.tokenManifestCount,4);
     assert.ok(manifest.shardCount>=4);
+    const alphaManifest=JSON.parse(await readFile(path.join(output,"mca","term","alpha","manifest.json"),"utf8"));
+    assert.equal(alphaManifest.token,"alpha");
+    assert.equal(alphaManifest.recordCount,1);
+    assert.deepEqual(alphaManifest.shards,["mca/term/alpha/part-00001.ndjson.gz"]);
     const shards=(await filesRecursive(output)).filter(file=>file.endsWith(".ndjson.gz"));
     assert.equal(shards.length,manifest.shardCount);
     const records=[];
