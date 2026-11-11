@@ -123,6 +123,116 @@ async function ogdLookup(env, field, value, limit = 10) {
     clearTimeout(timer);
   }
 }
+const DEFAULT_UDYAM_RESOURCE = "8b68ae56-84cf-4728-a0a6-1be11028dea7";
+const UDYAM_SOURCE_URL = "https://www.data.gov.in/resource/list-msme-registered-units-under-udyam";
+
+function normalizeUdyamRecord(record = {}) {
+  return {
+    stateCode: record.LG_ST_Code ?? null,
+    state: record.State ?? null,
+    districtCode: record.LG_DT_Code ?? null,
+    district: record.District ?? null,
+    pincode: record.Pincode ?? null,
+    registrationDate: record.RegistrationDate ?? null,
+    enterpriseName: record.EnterpriseName ?? null,
+    communicationAddress: record.CommunicationAddress ?? null,
+    activities: record.Activities ?? null,
+    evidenceStatus: "official_dataset_record",
+    source: {
+      publisher: "Ministry of Micro, Small and Medium Enterprises",
+      platform: "Open Government Data Platform India",
+      url: UDYAM_SOURCE_URL
+    }
+  };
+}
+
+async function udyamLookup(env, stateValue, districtValue, searchValue = "", limitValue = 50, offsetValue = 0) {
+  const state = cleanText(stateValue, 100).trim();
+  const district = cleanText(districtValue, 100).trim();
+  if (!state || !district) {
+    return { configured: !!env.DATA_GOV_API_KEY, records: [], error: { code:"state_district_required", message:"State and District are mandatory filters for this Udyam resource." } };
+  }
+  if (!env.DATA_GOV_API_KEY) {
+    return { configured:false, records:[], error:{ code:"api_key_required", message:"Configure DATA_GOV_API_KEY as a Cloudflare Worker secret. The same key can be reused for the MCA and Udyam data.gov.in resources." } };
+  }
+  const limit = Math.max(1, Math.min(Number.parseInt(limitValue,10) || 50, 100));
+  const offset = Math.max(0, Math.min(Number.parseInt(offsetValue,10) || 0, 10000000));
+  const resourceId = String(env.DATA_GOV_UDYAM_RESOURCE_ID || DEFAULT_UDYAM_RESOURCE).trim();
+  if (!/^[a-f0-9-]{36}$/i.test(resourceId)) {
+    return { configured:true, records:[], error:{ code:"invalid_resource_id", message:"DATA_GOV_UDYAM_RESOURCE_ID must be a valid UUID." } };
+  }
+  const cacheKey = "udyam:" + [resourceId,state.toLowerCase(),district.toLowerCase(),limit,offset].join(":");
+  const cached = await cachedGet(env, cacheKey);
+  if (cached) {
+    const rows = cached.records || [];
+    const filtered = filterUdyamRows(rows, searchValue);
+    return { ...cached, records:filtered, pageRecordCount:rows.length, matchedInPage:filtered.length, cached:true };
+  }
+  const url = new URL("https://api.data.gov.in/resource/" + resourceId);
+  url.searchParams.set("api-key", env.DATA_GOV_API_KEY);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("limit", String(limit));
+  url.searchParams.set("offset", String(offset));
+  url.searchParams.set("filters[State]", state);
+  url.searchParams.set("filters[District]", district);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const upstream = await fetch(url, { signal:controller.signal, headers:{accept:"application/json"} });
+    if (!upstream.ok) {
+      return {
+        configured:true, records:[], error:{
+          code:upstream.status === 429 ? "upstream_rate_limited" : "udyam_upstream_error",
+          status:upstream.status,
+          message:upstream.status === 403
+            ? "data.gov.in denied this request. Confirm the API key is active and that it has access to this resource."
+            : "The Udyam OGD API did not return a successful response. Check the State and District spelling and retry."
+        }
+      };
+    }
+    const payload = await upstream.json();
+    const rawRows = (payload.records || payload.data || []).map(normalizeUdyamRecord)
+      .filter(row => row.enterpriseName || row.pincode || row.registrationDate);
+    const total = Number(payload.total ?? payload.count ?? rawRows.length);
+    const responseData = {
+      configured:true,
+      records:rawRows,
+      state,
+      district,
+      total,
+      count:Number(payload.count ?? rawRows.length),
+      limit,
+      offset,
+      updatedDate:payload.updated_date || payload.updated_on || null,
+      source:"Ministry of Micro, Small and Medium Enterprises via data.gov.in",
+      sourceUrl:UDYAM_SOURCE_URL,
+      retrievedAt:new Date().toISOString(),
+      registrationNumberAvailable:false,
+      limitations:[
+        "The resource fields exposed in the catalogue do not include a Udyam Registration Number. This dataset cannot authenticate an individual Udyam number or certificate.",
+        "State and District are mandatory filters. Enterprise-name matching is performed only against the page of records returned for those filters.",
+        "A matching enterprise name is a dataset candidate, not proof that the person presenting an offer is authorised by that enterprise."
+      ]
+    };
+    await cachedPut(env, cacheKey, responseData, 21600);
+    const filtered = filterUdyamRows(rawRows, searchValue);
+    return { ...responseData, records:filtered, pageRecordCount:rawRows.length, matchedInPage:filtered.length };
+  } catch (error) {
+    return { configured:true, records:[], error:{ code:"udyam_unavailable", message:error.name === "AbortError" ? "The Udyam OGD request timed out." : "The Udyam OGD API could not be reached." } };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function filterUdyamRows(rows, query = "") {
+  const q = cleanText(query,120).trim().toLowerCase();
+  if (!q) return rows;
+  return rows.filter(row =>
+    [row.enterpriseName,row.activities,row.pincode].some(value => String(value || "").toLowerCase().includes(q))
+  );
+}
+
 async function wikidataSearch(query) {
   const url = new URL("https://www.wikidata.org/w/api.php");
   url.search = new URLSearchParams({ action:"wbsearchentities", search:query, language:"en", uselang:"en", format:"json", limit:"8", origin:"*" }).toString();
@@ -155,7 +265,7 @@ async function resolveSearch(query, env) {
     return { query, identifier, registry: [], registryConfigured: false, registryError: null, discovery: [], manualLookup: "https://www.mcacdm.nic.in/company-master-details", notes: ["This Worker connector is for the MCA company master-data resource keyed by CIN. LLPIN lookup remains an official manual MCA verification step; it is not incorrectly sent as a CIN filter."] };
   }
   if (identifier.type === "Udyam reference") {
-    return { query, identifier, registry: [], registryConfigured: false, discovery: [], manualLookup: "https://udyamregistration.gov.in/Udyam_Verify.aspx", notes: ["Udyam verification remains a manual official-portal step in this release."] };
+    return { query, identifier, registry: [], registryConfigured: false, discovery: [], manualLookup: "https://udyamregistration.gov.in/Udyam_Verify.aspx", notes: ["The data.gov.in MSME registered-units dataset does not expose a Udyam Registration Number field, so it cannot confirm this exact number. Use the official Udyam verification portal for certificate/number checks."] };
   }
   const domain = validPublicDomain(query);
   if (domain) return { query, identifier, registry: [], registryConfigured: false, discovery: [], domain, manualLookup: "https://www.mcacdm.nic.in/company-master-details" };
@@ -251,6 +361,22 @@ async function route(request, env) {
     const result = await resolveSearch(query,env);
     return response(result,200,origin);
   }
+  if (request.method === "GET" && url.pathname === "/v1/udyam/search") {
+    const state = cleanText(url.searchParams.get("state"),100).trim();
+    const district = cleanText(url.searchParams.get("district"),100).trim();
+    const search = cleanText(url.searchParams.get("q"),120).trim();
+    const limit = url.searchParams.get("limit") || "50";
+    const offset = url.searchParams.get("offset") || "0";
+    if (!state || !district) return jsonError("State and District are mandatory Udyam dataset filters.",400,origin,"state_district_required");
+    const result = await udyamLookup(env,state,district,search,limit,offset);
+    if (result.error && result.error.code === "api_key_required") {
+      return response(result,503,origin);
+    }
+    if (result.error && result.error.status) {
+      return response(result,502,origin);
+    }
+    return response(result,200,origin);
+  }
   if (request.method === "GET" && url.pathname.startsWith("/v1/company/")) {
     const identifier = decodeURIComponent(url.pathname.slice("/v1/company/".length));
     const parsed = classifyIdentifier(identifier);
@@ -283,12 +409,13 @@ async function route(request, env) {
     return response({
       capabilities:[
         {id:"mca_ogd",name:"MCA company master data via data.gov.in",configured:!!env.DATA_GOV_API_KEY,mode:env.DATA_GOV_API_KEY?"Live API connector":"Requires free data.gov.in API key",coverage:"Company/LLP master snapshot; not live MCA portal data"},
+        {id:"udyam_ogd",name:"MSME registered units under UDYAM via data.gov.in",configured:!!env.DATA_GOV_API_KEY,mode:env.DATA_GOV_API_KEY?"Live API connector; State and District required":"Requires DATA_GOV_API_KEY secret",coverage:"EnterpriseName, State, District, Pincode, RegistrationDate, CommunicationAddress and Activities. Udyam Registration Number is not exposed by this resource."},
         {id:"wikidata",name:"Wikidata company discovery",configured:true,mode:"Public API",coverage:"Third-party discovery candidates only"},
         {id:"dns",name:"DNS email and domain checks",configured:true,mode:"Google Public DNS-over-HTTPS",coverage:"A, AAAA, MX, TXT, NS and DMARC TXT records"},
         {id:"rdap",name:"Domain registration lookup",configured:true,mode:"RDAP public lookup",coverage:"Public registration data; may be redacted or unavailable"},
         {id:"email_headers",name:"Raw email header analysis",configured:true,mode:"Local parsing in Worker",coverage:"Header fields and reported SPF/DKIM/DMARC results; original headers must be authentic"}
       ],
-      limitations:["No LinkedIn scraping or private recruiter data access.","No inference of recruiter employment from a public profile.","No automated GST or Udyam portal scraping; official manual lookup is linked.","No automated vacancy/offer authenticity claim."]
+      limitations:["No LinkedIn scraping or private recruiter data access.","No inference of recruiter employment from a public profile.","GST verification remains an official manual lookup. The Udyam dataset search is a location-filtered enterprise list and does not expose Udyam Registration Numbers.","No automated vacancy/offer authenticity claim."]
     },200,origin);
   }
   return jsonError("Route not found.",404,origin,"not_found");
