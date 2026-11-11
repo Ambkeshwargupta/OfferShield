@@ -75,12 +75,15 @@ test("advanced workspace exposes Udyam State/District search and pagination", ()
   assert.match(html, /udyamNextPage/);
 });
 
-test("navigation uses the multi-element selector for page and nav collections", () => {
+test("navigation and hero actions have a capture-phase click fallback", () => {
+  assert.match(html, /function installOfferShieldClickFallback\(\)/);
+  assert.match(html, /addEventListener\("click",event=>\{/);
+  assert.match(html, /event\.stopImmediatePropagation\(\);go\(target\.dataset\.page\)/);
+  assert.match(html, /target\.id==="heroSearchBtn"/);
+  assert.match(html, /window\.addEventListener\("error"/);
   const start = html.indexOf("function go(page){");
-  const end = html.indexOf("\\nfunction initials", start);
-  const goSource = html.slice(start, end > start ? end : start + 900);
-  assert.ok(goSource.includes('$(".page").forEach'));
-  assert.ok(goSource.includes('$(".nav button").forEach'));
-  assert.ok(!goSource.startsWith('function go(page){$(".page")'));
-  assert.ok(!goSource.includes(');$(".nav button").forEach'));
+  const end = html.indexOf("function initials", start);
+  const goSource = html.slice(start, end);
+  assert.match(goSource, /\$\$\("\.page"\)\.forEach/);
+  assert.match(goSource, /\$\$\("\.nav button"\)\.forEach/);
 });
