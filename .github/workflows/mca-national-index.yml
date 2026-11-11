@@ -129,7 +129,7 @@ jobs:
           '
 
       - name: Build compressed token index and per-token manifests
-        run: node scripts/mca-build-r2-index.mjs --shard-size=10000
+        run: node scripts/mca-build-r2-index.mjs --shard-size=1000
 
       - name: Verify index coverage before publishing
         shell: bash
