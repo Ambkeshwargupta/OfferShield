@@ -188,6 +188,40 @@ const dynamicCompanies=new Map();
 let companySearchTimer=null,companySearchSequence=0;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function toast(msg){const el=$("#toast");el.textContent=msg;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2500)}
+function installOfferShieldClickFallback(){
+ document.addEventListener("click",event=>{
+  const origin=event.target instanceof Element?event.target:event.target?.parentElement;
+  const target=origin?.closest("[data-page],[data-goto],#heroSearchBtn,#companySearchBtn,#mobileMenu");
+  if(!target)return;
+  if(target.matches("[data-page]")){
+   event.preventDefault();event.stopImmediatePropagation();go(target.dataset.page);return;
+  }
+  if(target.matches("[data-goto]")){
+   event.preventDefault();event.stopImmediatePropagation();go(target.dataset.goto);return;
+  }
+  if(target.id==="heroSearchBtn"){
+   event.preventDefault();event.stopImmediatePropagation();
+   $("#companySearch").value=$("#heroSearch").value;
+   go("companies");filterCompanies();return;
+  }
+  if(target.id==="companySearchBtn"){
+   event.preventDefault();event.stopImmediatePropagation();filterCompanies();return;
+  }
+  if(target.id==="mobileMenu"){
+   event.preventDefault();event.stopImmediatePropagation();$("#sidebar").classList.toggle("open");
+  }
+ },true);
+}
+window.addEventListener("error",event=>{
+ console.error("OfferShield UI error:",event.error||event.message);
+ const el=$("#toast");
+ if(el){el.textContent="An interface error occurred. Please refresh and try again.";el.classList.add("show")}
+});
+window.addEventListener("unhandledrejection",event=>{
+ console.error("OfferShield async error:",event.reason);
+});
+installOfferShieldClickFallback();
+
 const DEMO_COMPANIES = [
 {id:"tcs",name:"Tata Consultancy Services",legalName:"Tata Consultancy Services Limited",entityType:"Public company",website:"https://www.tcs.com/",careers:"https://www.tcs.com/careers/india",linkedin:"https://www.linkedin.com/company/tata-consultancy-services/",domains:["tcs.com"],sector:"IT services & consulting",label:"Official-source reference",summary:"TCS publishes India careers information and a dedicated recruitment fraud alert. The alert identifies @tcs.com as its hiring email domain and publishes a recruitment helpline and email.",contacts:[{type:"Recruitment helpline",value:"1800-209-3111",sourceId:"tcs-fraud",sourceLabel:"TCS Recruitment Fraud Alert"},{type:"Recruitment email",value:"careers@tcs.com",sourceId:"tcs-fraud",sourceLabel:"TCS Recruitment Fraud Alert"}],policies:[{title:"Published email domain",detail:"TCS states that hiring emails are sent from @tcs.com. Email-domain comparison is a clue only; it does not authenticate an individual sender.",sourceId:"tcs-fraud"},{title:"Offer verification",detail:"TCS describes an offer verification tool for IT hires.",sourceId:"tcs-fraud"},{title:"Careers channel",detail:"Official India careers and entry-level opportunities are listed on the TCS careers site.",sourceId:"tcs-careers"}]},
 {id:"infosys",name:"Infosys",legalName:"Infosys Limited",entityType:"Public company",website:"https://www.infosys.com/",careers:"https://www.infosys.com/careers/",linkedin:"https://www.linkedin.com/company/infosys/",domains:["infosys.com"],sector:"IT services & consulting",label:"Official-source reference",summary:"Infosys publishes a recruitment fraud advisory. It states that its recruitment team corresponds from @infosys.com addresses and describes its hiring process as involving at least one interview.",contacts:[],policies:[{title:"Published email domain",detail:"Infosys identifies @infosys.com as its recruitment email domain.",sourceId:"infosys-fraud"},{title:"Published process guidance",detail:"Infosys says its hiring process involves at least one interview, virtual or in person. This is published guidance, not a universal rule for every business unit or role.",sourceId:"infosys-fraud"},{title:"Careers channel",detail:"Official careers portal.",sourceId:"infosys-careers"}]},
