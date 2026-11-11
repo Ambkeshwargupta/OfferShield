@@ -21,3 +21,8 @@ Community reports are structured, contain no free-text allegation field, remain 
 Moderators should approve only complete, plausible, policy-compliant structured submissions. Reject spam, personal information, threats, impersonation, duplicate floods, or content that attempts to identify individual candidates/recruiters. Do not treat a reported payment request or a single negative experience as proof of misconduct. Maintain a documented appeal/grievance route and periodically review old aggregates.
 
 The AI receives only aggregate counts, never individual reports. Community data is retrieval context, not model-weight training. Do not use unmoderated submissions or community patterns to automatically label a company fraudulent.
+
+
+## Public-web search data minimisation
+
+When Tavily search is enabled, send only the company name, submitted website/domain and optional recruiter name as search queries. Never send uploaded files, screenshots, chat/email text or recruiter email addresses to Tavily. Treat all search snippets and pages as untrusted input; do not follow instructions embedded in retrieved content. Display source URLs and snippets, not unsupported conclusions. Never label a LinkedIn page verified from follower count or search presence alone.
