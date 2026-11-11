@@ -703,6 +703,14 @@ async function analyseInternshipUpload(request, env, origin) {
   ])];
   const cins = [...new Set(evidence.toUpperCase().match(/\b[LU]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}\b/g) || [])];
   const gstins = [...new Set(evidence.toUpperCase().match(/\b\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]\b/g) || [])];
+  const emailHeaderTextPresent = /(?:^|\n)(?:From|Reply-To|Return-Path|Authentication-Results):/im.test(evidence);
+  const emailHeaderAnalysis = emailHeaderTextPresent ? parseEmailHeaders(evidence) : null;
+  const headerFromAddress = emailHeaderAnalysis?.from?.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null;
+  const headerFromDomain = normalizeDomain(headerFromAddress);
+  const submittedWebsiteDomain = normalizeDomain(website);
+  const emailDomainComparison = headerFromDomain
+    ? compareDomains(headerFromDomain,submittedWebsiteDomain ? [submittedWebsiteDomain] : [])
+    : null;
   const paymentLines = evidence.split(/[.!?\n]+/).map(x=>x.trim()).filter(x =>
     !/(no|without|never|not)\s+(any\s+)?(registration|processing|training|security|verification)\s*(fee|charge|deposit)/i.test(x) &&
     /(registration\s+fee|processing\s+fee|training\s+fee|security\s+deposit|verification\s+fee|refundable\s+deposit|pay.{0,40}(₹|rs\.?|inr|upi)|transfer.{0,40}(₹|rs\.?|inr|upi))/i.test(x)
@@ -821,6 +829,7 @@ async function analyseInternshipUpload(request, env, origin) {
   const user = JSON.stringify({
     companyName,website,role,recruiterName,recruiterEmail,jobSourceUrl,companyState,companyDistrict,evidence,
     extractedEmails:emailMatches,extractedUrls:urls,extractedCINs:cins,extractedGSTINs:gstins,
+    emailHeaderAnalysis,emailDomainComparison,
     paymentLanguage:paymentLines,mcaRecords,mcaSearch,udyamRecords,udyamSearch,publicDiscovery,
     domainChecks:domainChecks.map(x=>({
       domain:x.domain,emailSecurity:x.emailSecurity,
@@ -898,6 +907,8 @@ async function analyseInternshipUpload(request, env, origin) {
     questionsToAsk:Array.isArray(analysis.questionsToAsk)?analysis.questionsToAsk.slice(0,8):[],
     nextSteps:Array.isArray(analysis.nextSteps)?analysis.nextSteps.slice(0,8):[],
     recruiterProvided:{name:recruiterName,email:recruiterEmail,jobSourceUrl},
+    emailHeaderAnalysis,
+    emailDomainComparison,
     extracted:{emails:emailMatches,urls,domains,phones:[...new Set(evidence.match(/(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}\b/g)||[])],cins,gstins,paymentSignals:paymentLines},
     domainChecks,digitalFootprintSearches:searchLinks,
     uploadedEvidence:fileInfo.map(x=>({name:x.name,type:x.type,bytes:x.bytes,processed:true})),
