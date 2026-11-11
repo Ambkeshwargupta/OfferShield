@@ -612,6 +612,28 @@ function headerAnalysis(raw, expectedDomains = []) {
     limitations:"Authentication-Results are claims recorded by the receiving mail server. Pasted header text can be changed; inspect the original raw message from your mailbox. SPF/DKIM/DMARC pass does not establish recruiter employment or offer authority."
   };
 }
+function compactOfferMca(row = {}) {
+  return {
+    name:row.name || row.CompanyName || null,
+    identifier:row.identifier || row.cin || row.CIN || null,
+    status:row.status || row.CompanyStatus || null,
+    class:row.class || row.companyClass || null,
+    category:row.category || null,
+    subCategory:row.subCategory || null,
+    state:row.state || null,
+    roc:row.roc || null,
+    registrationDate:row.registrationDate || null,
+    authorizedCapital:row.authorizedCapital || null,
+    paidUpCapital:row.paidUpCapital || null,
+    registeredOffice:row.registeredOffice || null,
+    listingStatus:row.listingStatus || null,
+    industrialClassification:row.industrialClassification || null,
+    source:"MCA Company Master Data",
+    evidenceStatus:"official_dataset_record",
+    sourceUrl:"https://www.data.gov.in/catalog/company-master-data"
+  };
+}
+
 async function analyseInternshipUpload(request, env, origin) {
   if (!env.AI || typeof env.AI.run !== "function" || typeof env.AI.toMarkdown !== "function") {
     return jsonError("Workers AI is not enabled. Add the AI binding in Cloudflare and redeploy this Worker.",503,origin,"ai_not_enabled");
@@ -700,30 +722,18 @@ async function analyseInternshipUpload(request, env, origin) {
   try {
     if (cins.length) {
       const indexed = await searchNationalCompanyIndex(env,cins[0],5);
-      mcaRecords = (indexed.records || []).map(row=>({
-        name:row.name,identifier:row.identifier || row.cin,status:row.status,
-        registrationDate:row.registrationDate,source:"MCA Company Master Data",
-        sourceUrl:"https://www.data.gov.in/catalog/company-master-data"
-      }));
+      mcaRecords = (indexed.records || []).map(compactOfferMca);
       mcaSearch = {available:!!indexed.available,partial:false,strategy:indexed.strategy || "cin_lookup"};
       if (!mcaRecords.length && env.DATA_GOV_API_KEY) {
         const direct = await ogdLookup(env,"CIN",cins[0],5);
-        mcaRecords = (direct.records || []).map(row=>({
-          name:row.name,identifier:row.identifier,status:row.status,
-          registrationDate:row.registrationDate,source:"MCA Company Master Data",
-          sourceUrl:"https://www.data.gov.in/catalog/company-master-data"
-        }));
+        mcaRecords = (direct.records || []).map(compactOfferMca);
         mcaSearch = {available:!!direct.configured,partial:false,strategy:"ogd_exact_cin_lookup"};
       }
     } else if (companyName.length >= 2) {
       const r2 = await searchR2CompanyIndex(env,companyName,8);
       const d1 = (r2.records || []).length ? {records:[]} : await searchNationalCompanyIndex(env,companyName,8);
       const selected = (r2.records || []).length ? r2 : d1;
-      mcaRecords = (selected.records || []).map(row=>({
-        name:row.name,identifier:row.identifier || row.cin,status:row.status,
-        registrationDate:row.registrationDate,source:"MCA Company Master Data",
-        sourceUrl:"https://www.data.gov.in/catalog/company-master-data"
-      }));
+      mcaRecords = (selected.records || []).map(compactOfferMca);
       mcaSearch = {available:!!selected.available,partial:!!selected.partial,strategy:selected.strategy || "national_index"};
       if (!mcaRecords.length && env.DATA_GOV_API_KEY) {
         const direct = await ogdLookup(env,"CompanyName",companyName,8);
