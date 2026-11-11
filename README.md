@@ -35,6 +35,7 @@ OfferShield is an India-first company and recruitment due-diligence platform. Ca
 
 ### Cloudflare backend
 - MCA company master-data lookup through the current official data.gov.in portal API route (free registered API key required).
+- Udyam registered-unit discovery through the official data.gov.in resource, filtered by State and District. The dataset does not expose Udyam Registration Numbers, so it is not an exact certificate-verification API.
 - Durable page-by-page MCA bulk-data ingestion to Cloudflare R2, with a checkpoint persisted after each successfully uploaded page.
 - Bounded-memory national MCA token index with per-token shard manifests and rarest-token search.
 - Resumable bulk MCA company/LLP master-data downloader and D1 FTS5 national search-index importer (requires local key and configured D1; no national snapshot is bundled in Git).
@@ -78,7 +79,7 @@ Never put the government API key in `docs/index.html`, browser local storage or 
 - MCA OGD company master data is a periodic snapshot distributed by data.gov.in. It is not a live MCA portal transaction.
 - The OGD name filter is exact; fuzzy matches are discovery candidates and require manual entity resolution.
 - The dataset does not authenticate a recruiter or a particular vacancy/offer.
-- GST and Udyam checks are linked to official manual portals in this release; no CAPTCHA bypass or unauthorised scraping is implemented.
+- GST taxpayer verification remains an official manual lookup. Udyam regional enterprise discovery is available through the OGD dataset, while exact Udyam number/certificate verification remains a manual official-portal step because the dataset does not expose the registration number. No CAPTCHA bypass or unauthorised scraping is implemented.
 - EPFO is an official manual lookup link.
 - LinkedIn and job boards are linked for manual review; they are not scraped.
 - DNS/RDAP/SPF/DMARC signals describe technical records and do not establish company ownership or recruiter authority.
