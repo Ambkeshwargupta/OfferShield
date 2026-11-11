@@ -1,0 +1,64 @@
+name: MCA national company index import
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_records:
+        description: "Optional record cap for a test run; use 0 for the complete dataset"
+        required: true
+        default: "0"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offershield-mca-national-index-import
+  cancel-in-progress: false
+
+jobs:
+  import-national-mca:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      R2_BUCKET_NAME: offershield-company-index
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate required secrets and R2 bucket access
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in DATA_GOV_API_KEY CLOUDFLARE_ACCOUNT_ID AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+            if [ -z "${!name:-}" ]; then echo "Missing required GitHub Actions secret: $name"; exit 1; fi
+          done
+          aws --version
+          aws s3api head-bucket --bucket "$R2_BUCKET_NAME" --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com"
+      - name: Download official MCA company master data
+        shell: bash
+        env:
+          MAX_RECORDS: ${{ inputs.max_records }}
+        run: |
+          set -euo pipefail
+          if [ "$MAX_RECORDS" = "0" ]; then
+            node scripts/mca-download.mjs --page-size=10000 --delay-ms=1000
+          else
+            node scripts/mca-download.mjs --max-records="$MAX_RECORDS" --page-size=1000 --delay-ms=250
+          fi
+      - name: Build compact R2 token index
+        run: node scripts/mca-build-r2-index.mjs --shard-size=1000
+      - name: Upload index shards to Cloudflare R2
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws s3 sync ".data/mca/r2-index/" "s3://$R2_BUCKET_NAME/"             --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com"             --region auto --only-show-errors --no-progress --delete
+      - name: Report national index coverage
+        run: |
+          node -e 'const m=require("./.data/mca/r2-index/index-manifest.json"); console.log(JSON.stringify({importedCompanies:m.importedCompanies,tokenPostings:m.tokenPostings,uniqueTokens:m.uniqueTokens,shardCount:m.shardCount,sourceUpdatedAt:m.sourceUpdatedAt,generatedAt:m.generatedAt},null,2))'
