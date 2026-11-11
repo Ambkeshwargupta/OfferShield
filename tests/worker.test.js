@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../workers/api.js";
+import { gzipSync } from "node:zlib";
 
 function env(overrides={}) { return { ...overrides }; }
 const ctx={waitUntil(){}};
@@ -199,4 +200,38 @@ test("national company index reports not-ready state without breaking fallback s
   assert.equal(body.nationalIndex.available,false);
   assert.equal(body.nationalIndex.strategy,"company_index_not_ready");
   assert.match(body.nationalIndex.message,/Apply workers\/migrations/);
+});
+
+
+test("company name search uses the R2 national MCA token index",async()=>{
+  const row={i:"U12345MH2020PTC123456",n:"EXAMPLE INDUSTRIES PRIVATE LIMITED",k:"example industries private limited",s:"Active",t:"Maharashtra",d:"2020-04-01",c:"Private",r:"RoC Mumbai"};
+  const keys=[
+    "mca/term/example/part-00001.ndjson.gz",
+    "mca/term/industries/part-00001.ndjson.gz"
+  ];
+  const bucket={
+    async list({prefix,limit}) {
+      return {objects:keys.filter(key=>key.startsWith(prefix)).slice(0,limit).map(key=>({key})),truncated:false};
+    },
+    async get(key) {
+      return {body:new Response(gzipSync(JSON.stringify(row)+"\n")).body};
+    }
+  };
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({search:[]}),{status:200,headers:{"content-type":"application/json"}});
+  try {
+    const response=await worker.fetch(
+      new Request("https://api.example.workers.dev/v1/search?q=Example%20Industries"),
+      env({COMPANY_INDEX:bucket}),ctx
+    );
+    const body=await response.json();
+    assert.equal(response.status,200);
+    assert.equal(body.nationalIndex.strategy,"r2_token_prefix_postings");
+    assert.equal(body.nationalIndex.indexedMatches,1);
+    assert.equal(body.registry[0].name,row.n);
+    assert.equal(body.registry[0].identifier,row.i);
+    assert.equal(body.registry[0].evidenceStatus,"official_dataset_record");
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
 });
