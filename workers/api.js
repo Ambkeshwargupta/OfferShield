@@ -98,7 +98,7 @@ async function ogdLookup(env, field, value, limit = 10) {
   if (cached) return { configured: true, records: cached, cached: true };
   const resourceId = String(env.DATA_GOV_RESOURCE_ID || DEFAULT_OGD_RESOURCE).trim();
   if (!/^[a-f0-9-]{36}$/i.test(resourceId)) throw new Error("DATA_GOV_RESOURCE_ID must be a valid UUID.");
-  const url = new URL("https://api.data.gov.in/resource/" + resourceId);
+  const url = new URL(resourceId, String(env.DATA_GOV_API_BASE_URL || "https://www.data.gov.in/backend/dataapi/v1/resource/"));
   url.searchParams.set("api-key", env.DATA_GOV_API_KEY);
   url.searchParams.set("format", "json");
   url.searchParams.set("limit", String(Math.max(1, Math.min(limit, 100))));
@@ -168,7 +168,7 @@ async function udyamLookup(env, stateValue, districtValue, searchValue = "", lim
     const filtered = filterUdyamRows(rows, searchValue);
     return { ...cached, records:filtered, pageRecordCount:rows.length, matchedInPage:filtered.length, cached:true };
   }
-  const url = new URL("https://api.data.gov.in/resource/" + resourceId);
+  const url = new URL(resourceId, String(env.DATA_GOV_API_BASE_URL || "https://www.data.gov.in/backend/dataapi/v1/resource/"));
   url.searchParams.set("api-key", env.DATA_GOV_API_KEY);
   url.searchParams.set("format", "json");
   url.searchParams.set("limit", String(limit));
