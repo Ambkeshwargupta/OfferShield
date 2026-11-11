@@ -50,6 +50,18 @@ test("advanced intelligence UI exposes government, domain and email investigatio
   assert.match(html, /\/v1\/email\/headers/);
 });
 
+test("GitHub Pages uses the deployed OfferShield Worker by default", () => {
+  assert.match(html, /DEFAULT_WORKER_API="https:\/\/offershield-intelligence\.official-ambkeshwargupta\.workers\.dev"/);
+  assert.match(html, /localStorage\.getItem\("offershield_worker_api"\)\|\|DEFAULT_WORKER_API/);
+});
+
+test("Community Recruitment Intelligence is available in the public navigation", () => {
+  assert.match(html, /data-page="community"/);
+  assert.match(html, /Community Recruitment Intelligence/);
+  assert.match(html, /\/v1\/community\/reports/);
+  assert.match(html, /\/v1\/community\/insights/);
+});
+
 test("MCA records are visibly distinct from community discovery", () => {
   assert.match(html, /Official government dataset record/);
   assert.match(html, /Wikidata result — not registry verified/);
