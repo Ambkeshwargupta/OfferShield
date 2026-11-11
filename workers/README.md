@@ -78,3 +78,79 @@ Cloudflare Workers and D1 have free quotas, but their limits, enforcement and pr
 - Rate-limit hashes derive from Cloudflare's connecting IP; raw IPs are not stored.
 - Raw email headers pasted into the Worker are processed for the response and are not intentionally persisted; users should still redact personal data and only connect a Worker they control.
 - Review Cloudflare, data.gov.in, Google Public DNS and RDAP usage terms and quotas before broad public launch.
+
+
+## National MCA company search index (new)
+
+The API now queries a local D1 full-text index before using the existing exact OGD and Wikidata fallbacks. The local index can search only the records that have actually been imported; deploying the Worker or applying the schema does **not** populate the national dataset by itself.
+
+### Step 1 — Apply the search-index migration
+
+From the repository root:
+
+```bash
+npx wrangler d1 execute offershield-intelligence --remote --file=workers/migrations/0002_national_company_index.sql
+```
+
+For a brand-new database, `workers/schema.sql` also includes these tables and FTS5 triggers.
+
+### Step 2 — Download a small sample first
+
+Use Node.js 20+ and set the data.gov.in API key only in your local terminal. PowerShell:
+
+```powershell
+$env:DATA_GOV_API_KEY="YOUR_KEY"
+node scripts/mca-download.mjs --max-records=100 --page-size=100
+```
+
+macOS/Linux:
+
+```bash
+export DATA_GOV_API_KEY="YOUR_KEY"
+node scripts/mca-download.mjs --max-records=100 --page-size=100
+```
+
+The script writes a compact NDJSON snapshot under `.data/mca/`, and a checkpoint. The key is not written to the snapshot, checkpoint or console. Check that records were downloaded and inspect the first few lines before continuing.
+
+### Step 3 — Continue the full download
+
+```bash
+node scripts/mca-download.mjs --resume --page-size=1000
+```
+
+The downloader uses offset pagination, saves its checkpoint after each page, retries transient errors and can be resumed after interruption. If data.gov.in throttles the key, wait and rerun with `--resume`. The page size is configurable; use a smaller size if the resource rejects the requested limit. The API's returned `total` is the coverage target, not a number hard-coded in OfferShield.
+
+### Step 4 — Build bounded SQL import files
+
+```bash
+npm run mca:sql
+```
+
+This creates SQL shards in `.data/mca/sql/`. Inspect the total NDJSON and SQL disk sizes before importing. D1 Free currently allows 500 MB per database, so a complete national snapshot plus its full-text index may exceed one free database. Do **not** start the complete D1 import until the generated size has been compared with the actual D1 quota and the storage plan has been chosen. The data files remain local and are excluded from Git.
+
+### Step 5 — Import into D1
+
+Only after confirming sufficient D1 storage and applying the migration:
+
+```bash
+npm run mca:apply -- --remote --confirm=yes --database=offershield-intelligence
+```
+
+The import applies one SQL shard at a time. If a shard fails, fix the cause before rerunning; the statements use CIN upserts, so already imported rows can safely be replayed. This is a write operation against the named D1 database.
+
+### Step 6 — Verify the index
+
+Run this in the D1 console:
+
+```sql
+SELECT COUNT(*) AS indexed_records,
+       COUNT(DISTINCT cin) AS unique_identifiers,
+       MAX(source_updated_at) AS source_snapshot_date
+FROM companies;
+```
+
+Then search from OfferShield using a distinctive part of a company name or its CIN. The API response includes `nationalIndex` metadata showing whether the local index was available, how many indexed matches it returned and which search strategy it used.
+
+### Important scope
+
+The MCA master-data resource contains company and LLP master records in its published snapshot. It does not contain every informal business, every brand/alias, directors, recruiter employment, vacancies or offer authority. Udyam will be ingested separately after this MCA pipeline is validated. An imported record is evidence of a registry entry in a dated dataset snapshot, not proof that a specific job offer is genuine.
