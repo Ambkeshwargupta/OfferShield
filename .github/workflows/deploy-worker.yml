@@ -91,6 +91,20 @@ jobs:
           # Account ID is exported by ensure-cloudflare-d1.mjs from the verified dashboard account.
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
         run: printf '%s' "$DATA_GOV_API_KEY" | wrangler secret put DATA_GOV_API_KEY --config workers/wrangler.toml
+      - name: Set optional public-web search key
+        shell: bash
+        env:
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Account ID is exported by ensure-cloudflare-d1.mjs from the verified dashboard account.
+        run: |
+          set -euo pipefail
+          if [ -n "${TAVILY_API_KEY:-}" ]; then
+            printf '%s' "$TAVILY_API_KEY" | wrangler secret put TAVILY_API_KEY --config workers/wrangler.toml
+            echo "Tavily public-web search secret configured."
+          else
+            echo "TAVILY_API_KEY is not set; automatic public-web research will remain disabled."
+          fi
       - name: Verify live Worker, AI and Community Intelligence
         shell: bash
         env:
