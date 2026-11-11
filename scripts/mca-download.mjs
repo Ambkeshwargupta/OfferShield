@@ -157,7 +157,7 @@ async function main() {
         savedAt: new Date().toISOString()
       });
       console.log("Fetched " + downloaded.toLocaleString("en-IN") + (total ? " / " + total.toLocaleString("en-IN") : "") + " records; " + lines.length + " usable rows on last page.");
-      if (page.records.length < limit) break;
+      if (page.records.length < limit && (!total || offset >= total)) break;
       if (delayMs) await sleep(delayMs);
     }
   } finally {
