@@ -118,7 +118,7 @@ The script writes a compact NDJSON snapshot under `.data/mca/`, and a checkpoint
 node scripts/mca-download.mjs --resume --page-size=1000
 ```
 
-The downloader uses offset pagination, saves its checkpoint after each page, retries transient errors and can be resumed after interruption. If data.gov.in throttles the key, wait and rerun with `--resume`. The page size is configurable; use a smaller size if the resource rejects the requested limit. The API's returned `total` is the coverage target, not a number hard-coded in OfferShield.
+The downloader uses the verified OGD portal backend route (https://www.data.gov.in/backend/dataapi/v1/resource/), saves its checkpoint after each page, retries transient errors and can be resumed after interruption. The legacy https://api.data.gov.in/resource/ hostname returned connection failures in November 2026. The portal-side route was verified with HTTP 200 against the MCA resource and returned its live record count. DATA_GOV_API_BASE_URL can override this base for future portal changes. If data.gov.in throttles the key, wait and rerun with `--resume`. The page size is configurable; use a smaller size if the resource rejects the requested limit. The API's returned `total` is the coverage target, not a number hard-coded in OfferShield.
 
 ### Step 4 — Build bounded SQL import files
 
