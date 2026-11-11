@@ -218,7 +218,12 @@ test("company name search uses the R2 national MCA token index",async()=>{
     }
   };
   const originalFetch=globalThis.fetch;
-  globalThis.fetch=async()=>new Response(JSON.stringify({search:[]}),{status:200,headers:{"content-type":"application/json"}});
+  globalThis.fetch=async input=>{
+    const url=new URL(input);
+    if(url.hostname==="dns.google") return new Response(JSON.stringify({Status:0,Answer:[]}),{status:200,headers:{"content-type":"application/json"}});
+    if(url.hostname==="rdap.org") return new Response(JSON.stringify({ldhName:"example-startup.in",status:[],events:[],entities:[]}),{status:200,headers:{"content-type":"application/json"}});
+    return new Response(JSON.stringify({search:[]}),{status:200,headers:{"content-type":"application/json"}});
+  };
   try {
     const response=await worker.fetch(
       new Request("https://api.example.workers.dev/v1/search?q=Example%20Industries"),
