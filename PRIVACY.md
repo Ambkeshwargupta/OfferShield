@@ -5,7 +5,7 @@ OfferShield is designed to reduce the personal information needed for a recruitm
 ## Candidate messages, screenshots and documents
 
 - Remove or blur candidate personal phone numbers, home addresses, signatures, government IDs, PAN, Aadhaar, bank details, passwords and unrelated personal information before uploading evidence.
-- The student-facing investigation form accepts pasted messages and up to five PDF, DOCX, ODT, HTML, XML, PNG, JPG/JPEG or WEBP files, with a 12 MB combined upload limit.
+- The student-facing investigation form accepts pasted messages and up to five PDF, DOCX, XLS/XLSX, ODS/ODT, CSV, NUMBERS, HTML, XML, PNG, JPG/JPEG, WEBP, GIF, BMP or SVG files, with a 12 MB combined upload limit.
 - When a Cloudflare Worker with Workers AI is connected, uploaded files are sent to that Worker. The Worker uses Cloudflare Workers AI Markdown Conversion to extract text and image descriptions, then sends the extracted evidence and relevant company/domain signals to a Workers AI model for the structured assessment.
 - The OfferShield application does not write original file bytes or extracted offer/chat text into its D1 database, R2 company index or application report store. The Worker response contains the assessment, extracted indicators and uploaded-file metadata. The student can save that result summary in local browser storage.
 - Cloudflare processes the data in order to provide the AI conversion and inference services. Review Cloudflare's current terms, product documentation, account settings and data processing terms before using real student documents at scale. AI model inference is usage-metered; some image conversion may also consume Workers AI allocation.
