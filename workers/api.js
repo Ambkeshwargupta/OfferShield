@@ -652,9 +652,9 @@ const COMMUNITY_STAGES = new Set([
   "manager_interview","group_discussion","written_offer","background_check","other"
 ]);
 function communityCompanyKey(value) {
-  return cleanText(value,180).toLowerCase().normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"")
-    .replace(/\\b(private limited|pvt\\.? ltd\\.?|limited|ltd\\.?|llp|incorporated|inc\\.?)\\b/g," ")
-    .replace(/[^a-z0-9]+/g," ").trim().replace(/\\s+/g," ").slice(0,180);
+  return cleanText(value,180).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/\b(private limited|pvt\\.? ltd\\.?|limited|ltd\\.?|llp|incorporated|inc\\.?)\b/g," ")
+    .replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ").slice(0,180);
 }
 function randomCommunityToken() {
   const bytes = new Uint8Array(24);
@@ -1118,7 +1118,7 @@ async function analyseInternshipUpload(request, env, origin) {
 async function route(request, env) {
   const origin = corsOrigin(request, env);
   if (origin === null) return jsonError("Origin not allowed.", 403, "null", "origin_not_allowed");
-  if (request.method === "OPTIONS") return new Response(null, { status:204, headers:{"access-control-allow-origin":origin,"access-control-allow-methods":"GET,POST,OPTIONS","access-control-allow-headers":"content-type","access-control-max-age":"86400","vary":"Origin"} });
+  if (request.method === "OPTIONS") return new Response(null, { status:204, headers:{"access-control-allow-origin":origin,"access-control-allow-methods":"GET,POST,DELETE,OPTIONS","access-control-allow-headers":"content-type","access-control-max-age":"86400","vary":"Origin"} });
   const url = new URL(request.url);
   if (url.pathname === "/health" || url.pathname === "/v1/health") return response({ ok:true, service:"OfferShield Intelligence API", version:"1.2.0", officialOgdConfigured:!!env.DATA_GOV_API_KEY, d1Configured:!!env.DB, communityIntelligenceConfigured:!!env.DB, companyIndexConfigured:!!env.COMPANY_INDEX, aiConfigured:!!env.AI, documentConversionConfigured:!!(env.AI && typeof env.AI.toMarkdown === "function"), checkedAt:new Date().toISOString() },200,origin);
   if (!url.pathname.startsWith("/v1/")) return jsonError("Route not found.",404,origin,"not_found");
