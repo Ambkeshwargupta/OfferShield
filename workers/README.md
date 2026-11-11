@@ -80,77 +80,87 @@ Cloudflare Workers and D1 have free quotas, but their limits, enforcement and pr
 - Review Cloudflare, data.gov.in, Google Public DNS and RDAP usage terms and quotas before broad public launch.
 
 
-## National MCA company search index (new)
+## National MCA company search index
 
-The API now queries a local D1 full-text index before using the existing exact OGD and Wikidata fallbacks. The local index can search only the records that have actually been imported; deploying the Worker or applying the schema does **not** populate the national dataset by itself.
+The verified MCA OGD resource currently reports 3,738,721 company/LLP master records. The old `api.data.gov.in` host failed to connect during November 2026 testing; the current working route is `https://www.data.gov.in/backend/dataapi/v1/resource/`. The API connection test and a 1,000-record download both succeeded from GitHub Actions using the repository secret `DATA_GOV_API_KEY`.
 
-### Step 1 — Apply the search-index migration
+A 1,000-record sample measured 587,586 raw bytes and 69,966 gzip bytes. This is a planning estimate only; actual full-index size will be recorded in the generated manifest. A full MCA snapshot is too large to store together with a full-text index in one free D1 database. **The national name index therefore uses Cloudflare R2**, while D1 remains optional for cache, rate limits and smaller local indexes.
 
-From the repository root:
+### Recommended import: Cloudflare R2
+
+#### 1. Create the dedicated R2 bucket
+
+In Cloudflare Dashboard, open **R2 Object Storage → Create bucket** and create:
+
+`offershield-company-index`
+
+A dedicated bucket is important because the import workflow uses `aws s3 sync --delete` to remove stale index shards before replacing them.
+
+Alternatively, after `npx wrangler login`:
+
+```bash
+npx wrangler r2 bucket create offershield-company-index
+```
+
+#### 2. Create an R2 S3 API token
+
+In Cloudflare R2, create an S3 API token with **Object Read & Write** access scoped to the `offershield-company-index` bucket. Copy the Access Key ID and Secret Access Key when shown. Do not commit them or paste them into chat.
+
+Find your Cloudflare Account ID in the Cloudflare dashboard.
+
+#### 3. Add three GitHub Actions secrets
+
+Open the repository's [Actions secrets](https://github.com/Ambkeshwargupta/OfferShield/settings/secrets/actions) page and add:
+
+| Secret name | Value |
+|---|---|
+| `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID |
+| `R2_ACCESS_KEY_ID` | R2 S3 Access Key ID |
+| `R2_SECRET_ACCESS_KEY` | R2 S3 Secret Access Key |
+
+The existing `DATA_GOV_API_KEY` repository secret is reused. No key is written to the repository, downloaded dataset, index manifest or workflow output.
+
+#### 4. Deploy the Worker with the R2 binding
+
+The `workers/wrangler.toml` file now includes the `COMPANY_INDEX` R2 binding. After the bucket exists, from the repository's `workers` directory run:
+
+```bash
+npx wrangler login
+npx wrangler secret put DATA_GOV_API_KEY
+npx wrangler deploy
+```
+
+The same data.gov.in key is used for both MCA and Udyam API routes. D1 is optional for the national R2-backed company-name search; without D1, caching and database rate limiting are unavailable.
+
+#### 5. Run the full national import
+
+Open **GitHub → Actions → MCA national company index import → Run workflow**.
+
+For a safe R2 upload test, set `max_records` to `1000`. Once that succeeds, run it again with `max_records` set to `0` to fetch the complete current MCA snapshot. The workflow:
+
+1. Downloads the dataset from the verified OGD portal endpoint in resumable pages.
+2. Creates a bounded-memory token index in compressed NDJSON shards.
+3. Uploads those shards and an index manifest to the dedicated R2 bucket.
+4. Prints counts and the source snapshot date, not the company rows or API key.
+
+The import can take time and is subject to data.gov.in availability and rate limits. If interrupted, the download tool supports `--resume`; rerun the workflow only after checking the previous run and the local checkpoint. A GitHub-hosted runner is ephemeral, so a new run does not automatically retain the previous runner's `.data` directory. The resumable checkpoint is useful for local runs; for a new hosted runner, the workflow currently starts a fresh download.
+
+#### 6. Connect and verify
+
+After the Worker deploys, open OfferShield → **Advanced search & intelligence** → **Intelligence API connection**. Paste the Worker URL and connect it. Then search a company name such as `Infosys` or `Tata Motors`.
+
+The response includes `nationalIndex` metadata: index availability, matched record count, search strategy, and whether a broad token partition was capped. Each returned MCA result is labelled as a government dataset record and links back to its source catalogue.
+
+### Optional D1 index
+
+The D1 FTS5 migration and scripts remain available for smaller deployments or test datasets. Apply the migration with:
 
 ```bash
 npx wrangler --config workers/wrangler.toml d1 execute offershield-intelligence --remote --file=workers/migrations/0002_national_company_index.sql
 ```
 
-For a brand-new database, `workers/schema.sql` also includes these tables and FTS5 triggers.
-
-### Step 2 — Download a small sample first
-
-Use Node.js 20+ and set the data.gov.in API key only in your local terminal. PowerShell:
-
-```powershell
-$env:DATA_GOV_API_KEY="YOUR_KEY"
-node scripts/mca-download.mjs --max-records=100 --page-size=100
-```
-
-macOS/Linux:
-
-```bash
-export DATA_GOV_API_KEY="YOUR_KEY"
-node scripts/mca-download.mjs --max-records=100 --page-size=100
-```
-
-The script writes a compact NDJSON snapshot under `.data/mca/`, and a checkpoint. The key is not written to the snapshot, checkpoint or console. Check that records were downloaded and inspect the first few lines before continuing.
-
-### Step 3 — Continue the full download
-
-```bash
-node scripts/mca-download.mjs --resume --page-size=1000
-```
-
-The downloader uses the verified OGD portal backend route (https://www.data.gov.in/backend/dataapi/v1/resource/), saves its checkpoint after each page, retries transient errors and can be resumed after interruption. The legacy https://api.data.gov.in/resource/ hostname returned connection failures in November 2026. The portal-side route was verified with HTTP 200 against the MCA resource and returned its live record count. DATA_GOV_API_BASE_URL can override this base for future portal changes. If data.gov.in throttles the key, wait and rerun with `--resume`. The page size is configurable; use a smaller size if the resource rejects the requested limit. The API's returned `total` is the coverage target, not a number hard-coded in OfferShield.
-
-### Step 4 — Build bounded SQL import files
-
-```bash
-npm run mca:sql
-```
-
-This creates SQL shards in `.data/mca/sql/`. Inspect the total NDJSON and SQL disk sizes before importing. D1 Free currently allows 500 MB per database, so a complete national snapshot plus its full-text index may exceed one free database. Do **not** start the complete D1 import until the generated size has been compared with the actual D1 quota and the storage plan has been chosen. The data files remain local and are excluded from Git.
-
-### Step 5 — Import into D1
-
-Only after confirming sufficient D1 storage and applying the migration:
-
-```bash
-npm run mca:apply -- --remote --confirm=yes --database=offershield-intelligence
-```
-
-The import applies one SQL shard at a time. If a shard fails, fix the cause before rerunning; the statements use CIN upserts, so already imported rows can safely be replayed. This is a write operation against the named D1 database.
-
-### Step 6 — Verify the index
-
-Run this in the D1 console:
-
-```sql
-SELECT COUNT(*) AS indexed_records,
-       COUNT(DISTINCT cin) AS unique_identifiers,
-       MAX(source_updated_at) AS source_snapshot_date
-FROM companies;
-```
-
-Then search from OfferShield using a distinctive part of a company name or its CIN. The API response includes `nationalIndex` metadata showing whether the local index was available, how many indexed matches it returned and which search strategy it used.
+Do not attempt to import the complete national dataset into D1 Free. D1 has a 500 MB per-database limit; the full snapshot and full-text index may exceed it. The R2 workflow is the intended national-scale route.
 
 ### Important scope
 
-The MCA master-data resource contains company and LLP master records in its published snapshot. It does not contain every informal business, every brand/alias, directors, recruiter employment, vacancies or offer authority. Udyam will be ingested separately after this MCA pipeline is validated. An imported record is evidence of a registry entry in a dated dataset snapshot, not proof that a specific job offer is genuine.
+The MCA master-data resource covers company and LLP master records in its published snapshot. It does not contain every informal business, every brand/alias, directors, filings, financial statements, recruiter employment, vacancies or offer authority. Udyam will be integrated separately after MCA ingestion is validated. A government registry record is evidence of an entry in a dated dataset snapshot, not proof that a particular job offer is genuine.
