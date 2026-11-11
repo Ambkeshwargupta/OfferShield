@@ -110,7 +110,7 @@ test("Udyam route calls the correct resource with mandatory filters and normaliz
     const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/udyam/search?state=Madhya%20Pradesh&district=Indore&q=engineering&limit=10&offset=0"),env({DATA_GOV_API_KEY:"test-key"}),ctx);
     const body=await response.json();
     assert.equal(response.status,200);
-    assert.equal(requestedUrl.pathname,"/resource/8b68ae56-84cf-4728-a0a6-1be11028dea7");
+    assert.equal(requestedUrl.pathname,"/backend/dataapi/v1/resource/8b68ae56-84cf-4728-a0a6-1be11028dea7");
     assert.equal(requestedUrl.searchParams.get("format"),"json");
     assert.equal(requestedUrl.searchParams.get("filters[State]"),"Madhya Pradesh");
     assert.equal(requestedUrl.searchParams.get("filters[District]"),"Indore");
