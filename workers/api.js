@@ -653,7 +653,7 @@ const COMMUNITY_STAGES = new Set([
 ]);
 function communityCompanyKey(value) {
   return cleanText(value,180).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
-    .replace(/\b(private limited|pvt\\.? ltd\\.?|limited|ltd\\.?|llp|incorporated|inc\\.?)\b/g," ")
+    .replace(/\b(private\s+limited|pvt\.?\s+ltd\.?|limited|ltd\.?|llp|incorporated|inc\.?)\b/g," ")
     .replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ").slice(0,180);
 }
 function randomCommunityToken() {
@@ -1232,7 +1232,8 @@ async function route(request, env) {
         {id:"dns",name:"DNS email and domain checks",configured:true,mode:"Google Public DNS-over-HTTPS",coverage:"A, AAAA, MX, TXT, NS and DMARC TXT records"},
         {id:"rdap",name:"Domain registration lookup",configured:true,mode:"RDAP public lookup",coverage:"Public registration data; may be redacted or unavailable"},
         {id:"email_headers",name:"Raw email header analysis",configured:true,mode:"Local parsing in Worker",coverage:"Header fields and reported SPF/DKIM/DMARC results; original headers must be authentic"},
-        {id:"internship_offer_ai",name:"AI internship and offer evidence review",configured:!!env.AI,mode:env.AI?"Workers AI binding enabled":"Requires Workers AI binding",coverage:"Reads PDF, DOCX and screenshots; analyses offer terms, explicit recruitment stages, risk signals and evidence gaps without certifying authenticity."}
+        {id:"internship_offer_ai",name:"AI internship and offer evidence review",configured:!!env.AI,mode:env.AI?"Workers AI binding enabled":"Requires Workers AI binding",coverage:"Reads PDF, DOCX and screenshots; analyses offer terms, explicit recruitment stages, risk signals and evidence gaps without certifying authenticity."},
+        {id:"community_recruitment_intelligence",name:"Community Recruitment Intelligence",configured:!!env.DB,mode:env.DB?"D1 connected; requires 0003 migration and moderation":"Requires D1 binding and 0003 migration",coverage:"Opt-in structured, anonymised, moderated student recruitment experiences; aggregate patterns only after at least three approved reports, retrieved as AI context rather than model fine-tuning."}
       ],
       limitations:["No LinkedIn scraping or private recruiter data access.","No inference of recruiter employment from a public profile.","GST verification remains an official manual lookup. The Udyam dataset search is a location-filtered enterprise list and does not expose Udyam Registration Numbers.","No automated vacancy/offer authenticity claim. AI internship/offer analysis is an evidence review only; company-specific recruitment stages are not inferred when source evidence is missing."]
     },200,origin);
