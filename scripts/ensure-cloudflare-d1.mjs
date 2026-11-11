@@ -39,24 +39,29 @@ if (!database) {
 if (!database?.uuid) throw new Error("Cloudflare did not return a D1 database UUID.");
 
 let config = await readFile(configPath, "utf8");
-const bindingPattern = /^\\[\\[d1_databases\\]\\][\\s\\S]*?^binding\\s*=\\s*"DB"\\s*$/m;
-if (!bindingPattern.test(config)) {
-  config = config.replace(/\\s*# Create a D1 database[\\s\\S]*?(?=\\n# Store DATA_GOV_API_KEY)/, "");
-  config = config.replace(/\\s*$/, "") + [
+const hasDbBlock = config.includes("[[d1_databases]]") && config.includes('binding = "DB"');
+if (!hasDbBlock) {
+  const commentStart = config.indexOf("# Create a D1 database");
+  const commentEnd = config.indexOf("# Store DATA_GOV_API_KEY", commentStart);
+  if (commentStart >= 0 && commentEnd > commentStart) {
+    config = config.slice(0, commentStart) + config.slice(commentEnd);
+  }
+  config = config.trimEnd() + [
     "",
     "[[d1_databases]]",
     'binding = "DB"',
     'database_name = "' + databaseName + '"',
     'database_id = "' + database.uuid + '"',
     ""
-  ].join("\\n");
+  ].join("\n");
 } else {
-  const existingBlock = config.match(/^\\[\\[d1_databases\\]\\]([\\s\\S]*?)(?=^\\[\\[|^\\[[^\\[]|$)/m)?.[1] || "";
+  const blockStart = config.indexOf("[[d1_databases]]");
+  const blockEnd = config.indexOf("\n[[", blockStart + 1);
+  const existingBlock = config.slice(blockStart, blockEnd >= 0 ? blockEnd : undefined);
   if (!existingBlock.includes('database_name = "' + databaseName + '"') ||
       !existingBlock.includes('database_id = "' + database.uuid + '"')) {
     throw new Error("workers/wrangler.toml has a D1 DB binding, but it does not match the Cloudflare database found. Review it before redeploying.");
   }
 }
-
 await writeFile(configPath, config, "utf8");
 console.log("D1 is ready: " + databaseName + ". The database UUID is stored in workers/wrangler.toml; it is not a secret.");
