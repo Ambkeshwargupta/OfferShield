@@ -260,16 +260,135 @@ function companyIndexQuery(query) {
   return [...new Set(tokens)].filter(token => token.length >= 3 && !COMPANY_NAME_STOP_WORDS.has(token)).slice(0, 3);
 }
 
+const MAX_R2_SHARDS_PER_SEARCH = 32;
+const MAX_R2_PREFIX_MANIFESTS = 8;
+
+function rowMatchesSearchTokens(row, tokens) {
+  const words = String(row.k || "").split(/\s+/).filter(Boolean);
+  return tokens.every(token => words.some(word => word.startsWith(token)));
+}
+
+async function parseR2TokenManifest(bucket, token) {
+  const object = await bucket.get("index/mca/term/" + token + "/manifest.json");
+  if (!object) return null;
+  try {
+    const manifest = JSON.parse(await object.text());
+    if (manifest?.version !== 2 || manifest.token !== token || !Array.isArray(manifest.shards)) return null;
+    const shards = manifest.shards.filter(key =>
+      typeof key === "string" &&
+      key.startsWith("mca/term/" + token + "/part-") &&
+      key.endsWith(".ndjson.gz")
+    );
+    if (shards.length !== manifest.shards.length) return null;
+    return { token, recordCount:Number(manifest.recordCount || 0), shards };
+  } catch {
+    return null;
+  }
+}
+
 async function searchR2CompanyIndex(env, query, limit = 12) {
   if (!env.COMPANY_INDEX) return { configured:false, available:false, records:[], strategy:"r2_not_configured" };
   const identifier = classifyIdentifier(query);
   if (identifier.type !== "Company name") return { configured:true, available:false, records:[], strategy:"r2_name_index_only" };
   const tokens = companyIndexQuery(query);
   if (!tokens.length) return { configured:true, available:true, records:[], strategy:"r2_no_searchable_tokens", partial:false };
-  const tokenSets = [];
-  let partial = false;
-  let scannedShards = 0;
+
   try {
+    // Version 2 index: resolve exact token manifests first, then allow short
+    // prefixes such as "infosy" to discover a bounded number of token variants.
+    const manifests = [];
+    const manifestTokens = new Set();
+    let partial = false;
+    for (const token of tokens) {
+      const exact = await parseR2TokenManifest(env.COMPANY_INDEX, token);
+      if (exact) {
+        manifests.push(exact);
+        manifestTokens.add(exact.token);
+      }
+    }
+    if (manifests.length < tokens.length) {
+      for (const token of tokens) {
+        if (manifestTokens.has(token) || manifests.length >= MAX_R2_PREFIX_MANIFESTS) continue;
+        const listing = await env.COMPANY_INDEX.list({
+          prefix:"index/mca/term/" + token,
+          delimiter:"/",
+          limit:1000
+        });
+        if (listing.truncated) partial = true;
+        const discovered = new Set([
+          ...(listing.delimitedPrefixes || []).map(prefix => String(prefix).split("/")[3]),
+          ...(listing.objects || []).map(item => String(item.key || "").split("/")[3])
+        ].filter(name => name && name.startsWith(token)));
+        for (const candidate of [...discovered].sort()) {
+          if (manifests.length >= MAX_R2_PREFIX_MANIFESTS) {
+            partial = true;
+            break;
+          }
+          if (manifestTokens.has(candidate)) continue;
+          const manifest = await parseR2TokenManifest(env.COMPANY_INDEX, candidate);
+          if (manifest) {
+            manifests.push(manifest);
+            manifestTokens.add(candidate);
+          }
+        }
+      }
+    }
+
+    if (manifests.length) {
+      // The rarest available token is the smallest candidate set. Each posting
+      // carries the normalized full company name, so all query tokens can be
+      // verified locally without reading every token's shards.
+      manifests.sort((a,b) => a.recordCount - b.recordCount || a.shards.length - b.shards.length || a.token.localeCompare(b.token));
+      const selected = manifests[0];
+      const shardsToRead = selected.shards.slice(0, MAX_R2_SHARDS_PER_SEARCH);
+      if (selected.shards.length > shardsToRead.length) partial = true;
+      const matches = new Map();
+      let scannedShards = 0;
+      for (const key of shardsToRead) {
+        const object = await env.COMPANY_INDEX.get("index/" + key);
+        if (!object?.body) {
+          partial = true;
+          continue;
+        }
+        const decompressed = object.body.pipeThrough(new DecompressionStream("gzip"));
+        const contents = await new Response(decompressed).text();
+        scannedShards++;
+        for (const line of contents.split(/\r?\n/)) {
+          if (!line) continue;
+          let row;
+          try { row = JSON.parse(line); } catch { continue; }
+          if (row.i && rowMatchesSearchTokens(row, tokens)) matches.set(String(row.i), row);
+        }
+      }
+      const queryNorm = tokens.join(" ");
+      const records = [...matches.values()].map(row => ({
+        identifier:row.i, name:row.n, status:row.s, state:row.t,
+        registrationDate:row.d, class:row.c, roc:row.r,
+        category:row.g, subCategory:row.u,
+        authorizedCapital:row.a, paidUpCapital:row.p,
+        registeredOffice:row.o, listingStatus:row.l,
+        industrialClassification:row.x,
+        source:"MCA Company Master Data (R2 national token index)",
+        sourceUrl:"https://www.data.gov.in/catalog/company-master-data",
+        matchScore:String(row.k || "").startsWith(queryNorm) ? 1 : tokens.length > 1 ? 0.96 : 0.9
+      })).sort((a,b) => b.matchScore - a.matchScore || String(a.name).localeCompare(String(b.name))).slice(0,limit);
+      return {
+        configured:true, available:true, records,
+        strategy:"r2_token_manifest_postings",
+        partial,
+        scannedShards,
+        indexedTokens:tokens.length,
+        selectedToken:selected.token,
+        candidateManifestCount:manifests.length,
+        message:partial ? "This search was capped by the R2 request budget. Add more of the company name to narrow the search." : null
+      };
+    }
+
+    // Backward compatibility for the earlier index layout (before per-token
+    // manifests were generated). The result is explicitly marked partial.
+    const tokenSets = [];
+    let scannedShards = 0;
+    const matchesByToken = [];
     for (const token of tokens) {
       const prefix = "mca/term/" + token.slice(0, Math.min(5, token.length));
       const listedTerms = await env.COMPANY_INDEX.list({ prefix, limit:1000 });
@@ -278,15 +397,16 @@ async function searchR2CompanyIndex(env, query, limit = 12) {
         .map(item => String(item.key || "").split("/")[2])
         .filter(term => term && term.startsWith(token)))];
       allTerms.sort((a,b) => a === token ? -1 : b === token ? 1 : a.localeCompare(b));
-      const chosenTerms = allTerms.slice(0, 2);
-      if (allTerms.length > chosenTerms.length) partial = true;
-      const matches = new Map();
-      for (const term of chosenTerms) {
-        const partListing = await env.COMPANY_INDEX.list({ prefix:"mca/term/" + term + "/", limit:10 });
+      const selectedTerms = allTerms.slice(0, 2);
+      if (allTerms.length > selectedTerms.length) partial = true;
+      const tokenMatches = new Map();
+      for (const term of selectedTerms) {
+        const partListing = await env.COMPANY_INDEX.list({ prefix:"mca/term/" + term + "/", limit:1000 });
         if (partListing.truncated) partial = true;
-        const parts = (partListing.objects || []).slice(0, 2);
-        if ((partListing.objects || []).length > parts.length) partial = true;
-        for (const part of parts) {
+        const parts = partListing.objects || [];
+        const remaining = MAX_R2_SHARDS_PER_SEARCH - scannedShards;
+        if (parts.length > remaining) partial = true;
+        for (const part of parts.slice(0, Math.max(0, remaining))) {
           const object = await env.COMPANY_INDEX.get(part.key);
           if (!object?.body) continue;
           const decompressed = object.body.pipeThrough(new DecompressionStream("gzip"));
@@ -296,45 +416,47 @@ async function searchR2CompanyIndex(env, query, limit = 12) {
             if (!line) continue;
             let row;
             try { row = JSON.parse(line); } catch { continue; }
-            const nameTokens = String(row.k || "").split(" ");
-            if (!nameTokens.some(word => word.startsWith(token))) continue;
-            if (row.i) matches.set(String(row.i), row);
+            if (row.i && String(row.k || "").split(" ").some(word => word.startsWith(token))) tokenMatches.set(String(row.i), row);
           }
+          if (scannedShards >= MAX_R2_SHARDS_PER_SEARCH) break;
         }
+        if (scannedShards >= MAX_R2_SHARDS_PER_SEARCH) break;
       }
-      tokenSets.push(matches);
-      if (!matches.size) break;
+      matchesByToken.push(tokenMatches);
+      if (!tokenMatches.size) break;
     }
     let records = [];
-    if (tokenSets.length === tokens.length && tokenSets.every(set => set.size)) {
-      const first = tokenSets[0];
-      const queryNorm = tokens.join(" ");
-      records = [...first.entries()]
-        .filter(([identifier]) => tokenSets.every(set => set.has(identifier)))
-        .map(([,row]) => ({
+    if (matchesByToken.length === tokens.length && matchesByToken.every(set => set.size)) {
+      const first = matchesByToken.sort((a,b) => a.size - b.size)[0];
+      records = [...first.values()]
+        .filter(row => rowMatchesSearchTokens(row, tokens))
+        .map(row => ({
           identifier:row.i, name:row.n, status:row.s, state:row.t,
           registrationDate:row.d, class:row.c, roc:row.r,
           category:row.g, subCategory:row.u,
           authorizedCapital:row.a, paidUpCapital:row.p,
           registeredOffice:row.o, listingStatus:row.l,
           industrialClassification:row.x,
-          source:"MCA Company Master Data (R2 token index)",
+          source:"MCA Company Master Data (legacy R2 token index)",
           sourceUrl:"https://www.data.gov.in/catalog/company-master-data",
-          matchScore:String(row.k || "").startsWith(queryNorm) ? 1 : tokens.length > 1 ? 0.96 : 0.9
+          matchScore:String(row.k || "").startsWith(tokens.join(" ")) ? 1 : tokens.length > 1 ? 0.96 : 0.9
         }))
         .sort((a,b) => b.matchScore - a.matchScore || String(a.name).localeCompare(String(b.name)))
-        .slice(0, limit);
+        .slice(0,limit);
     }
     return {
-      configured:true, available:true, records, strategy:"r2_token_prefix_postings",
-      partial, scannedShards, indexedTokens:tokens.length,
-      message:partial ? "Some broad token partitions were capped for response time. Refine the company name for a narrower search." : null
+      configured:true, available:true, records,
+      strategy:"r2_token_prefix_postings",
+      partial:true,
+      scannedShards,
+      indexedTokens:tokens.length,
+      message:"The legacy index layout has no per-token manifests. Results may be incomplete; rebuild the index to enable bounded rarest-token search."
     };
-  } catch (error) {
+  } catch {
     return {
       configured:true, available:false, records:[],
       strategy:"r2_index_unavailable",
-      message:"The R2 company index could not be queried. Confirm the COMPANY_INDEX binding and that the national index upload is complete."
+      message:"The R2 company index could not be queried. Confirm the COMPANY_INDEX binding and that the published national index upload is complete."
     };
   }
 }
