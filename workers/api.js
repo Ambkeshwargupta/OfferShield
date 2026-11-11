@@ -1230,10 +1230,14 @@ async function analyseInternshipUpload(request, env, origin) {
   let finalHeadline = cleanText(analysis.headline,160);
   let finalSummary = cleanText(analysis.summary,1400);
   if (pastExperienceDocument) {
-    finalVerdict = "insufficient_evidence";
-    finalRiskLevel = "unknown";
+    const documentIntegrityFlags = flags.filter(flag=>/(forg|counterfeit|tamper|alter|signature.{0,30}(mismatch|inconsistent|invalid)|issuer.{0,30}(mismatch|unverified|denies)|document number.{0,30}(invalid|not found)|company.{0,30}(denies|disputes)|impersonat|lookalike)/i.test(String(flag)));
+    flags = documentIntegrityFlags;
+    finalVerdict = documentIntegrityFlags.length ? "caution" : "insufficient_evidence";
+    finalRiskLevel = documentIntegrityFlags.length ? "moderate" : "unknown";
     finalHeadline = documentType==="internship_certificate" ? "This appears to be a completed-internship certificate, not a new offer letter." : "This appears to be past-employment / internship evidence, not a new offer letter.";
-    finalSummary = "OfferShield has switched this review to past-experience document review. Missing offer terms, stipend details or recruitment stages are not fraud signals for a completion certificate. Review the issuer, student name, role, dates and signatory against independent company sources.";
+    finalSummary = documentIntegrityFlags.length
+      ? "OfferShield has switched this review to past-experience document review. It found a document-integrity concern that should be checked against the issuer; missing offer terms, stipend details or recruitment stages are not fraud signals for a completion certificate."
+      : "OfferShield has switched this review to past-experience document review. Missing offer terms, stipend details or recruitment stages are not fraud signals for a completion certificate. Review the issuer, student name, role, dates and signatory against independent company sources.";
   } else if (finalVerdict==="high_risk" && !seriousRiskSignal) {
     finalVerdict = "caution";
     finalRiskLevel = "moderate";
