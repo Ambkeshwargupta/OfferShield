@@ -14,6 +14,9 @@ This API is separate from GitHub Pages. GitHub Pages hosts the static premium we
 - Domain intelligence: A, AAAA, MX, TXT, NS and DMARC DNS records.
 - Public RDAP registration-data lookup.
 - Original email-header parsing: From, Reply-To, Return-Path, Authentication-Results and DKIM selector/domain extraction; optional comparison against a company-published domain.
+- AI-assisted student internship and offer review through POST /v1/investigate: accepts pasted chat/offer text and PDF, DOCX, ODT, HTML, XML, PNG, JPG or WEBP screenshots/documents (up to five files and 12 MB combined).
+- Uses env.AI.toMarkdown() to extract document/screenshot content and Workers AI Llama 3.3 70B JSON mode to return offer terms, stages explicitly mentioned in the student's evidence, typical possible stages (separately labelled), risk indicators, consistency signals, missing details, questions and next steps.
+- Checks at most one primary candidate-provided domain per investigation plus MCA indexed-name evidence when available; returns public search routes for company/recruiter footprint follow-up.
 - Company-published recruitment/fraud contact lookup from the D1 source register.
 - Evidence labels and explicit limitations.
 - D1 API response cache, company claim observations, contact evidence and hashed-IP rate limiting.
@@ -68,6 +71,18 @@ The current published Cloudflare documentation lists these example free-plan quo
 
 The Worker and schema are designed to cache OGD requests and expire operational rows daily, but they cannot bypass provider quotas. Consider a paid plan only after actual usage requires it.
 Cloudflare Workers and D1 have free quotas, but their limits, enforcement and prices can change. Check the current [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) and [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/) before public traffic grows. D1 must be configured for the Worker cache, source observations, contact directory and distributed rate limiting to persist.
+
+## Student internship and offer evidence analysis
+
+The public **Investigate an offer** workspace accepts a company name, website, role, recruiter details, job-source URL, pasted chat/email/message text and up to five supporting files (12 MB combined). Supported file types are PDF, DOCX, ODT, HTML, HTM, XML, PNG, JPG/JPEG and WEBP. TXT/EML content can be pasted into the message field.
+
+The Worker calls the Workers AI Markdown Conversion method (env.AI.toMarkdown) to extract text and image descriptions. It then sends the evidence text plus available MCA and primary-domain signals to the configured Workers AI text model for structured analysis. The model output is constrained to offer terms, stages explicitly mentioned in the student's evidence, typical possible stages (shown separately), risk indicators, consistency signals, missing information, questions and next steps.
+
+**Evidence boundaries:** student-submitted screenshots and offer letters are claims supplied by the candidate, not company-published proof. The application never certifies an offer as genuine, does not infer recruiter employment, and does not invent selection stages. A government company record and DNS/RDAP results cannot establish that a recruiter is authorised or that a vacancy exists.
+
+**Processing and privacy:** the OfferShield Worker does not write uploaded file bytes or extracted offer text to D1/R2 or the report store. The file and its extracted content are sent to Cloudflare Workers AI for document conversion/inference. The response contains a summary and file metadata only; the browser may save that summary in local storage. Do not upload Aadhaar, PAN, bank details, passwords, full home addresses or unrelated personal records. Students should blur personal information in screenshots before upload. Review Cloudflare's applicable terms and data-retention settings for the account hosting the Worker.
+
+**Enablement:** workers/wrangler.toml includes the Workers AI binding: [ai] binding = "AI". Redeploy the Worker after this binding is added. The health endpoint reports aiConfigured and documentConversionConfigured; the Advanced Search connection test shows whether AI is enabled. Workers AI model inference is metered. Markdown conversion is free for most file conversions, while some image conversion paths may invoke models and use AI allocation. Review current [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) and [Markdown Conversion](https://developers.cloudflare.com/workers-ai/features/markdown-conversion/) before broad public use.
 
 ## Operational and security notes
 
