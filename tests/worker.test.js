@@ -400,12 +400,19 @@ test("community intelligence requires D1 and never pretends a local fallback is 
 });
 
 test("community report requires explicit own-experience consent",async()=>{
+  const writes=[];
+  const db={prepare(sql){return {sql,bind(...values){return {
+    run:async()=>{if(sql.includes("INSERT INTO community_reports"))writes.push({sql,values});return {success:true}},
+    first:async()=>({count:1})
+  }}}}};
   const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/community/reports",{
-    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({companyName:"Example Startup",consent:false,selfReport:true,consentVersion:"community-v1"})
-  }),env({DB:{prepare(){throw new Error("Should reject before writing")}}}),ctx);
+    method:"POST",headers:{"content-type":"application/json","CF-Connecting-IP":"192.0.2.11"},
+    body:JSON.stringify({companyName:"Example Startup",consent:false,selfReport:true,consentVersion:"community-v1"})
+  }),env({DB:db}),ctx);
   const body=await response.json();
   assert.equal(response.status,400);
   assert.equal(body.error.code,"community_consent_required");
+  assert.equal(writes.length,0);
 });
 
 test("community reports store structured fields only and return one-time deletion credentials",async()=>{
@@ -457,8 +464,9 @@ test("community insights aggregate only approved reports after the three-report 
   assert.equal(response.status,200);
   assert.equal(body.insights.thresholdMet,true);
   assert.equal(body.insights.reportCount,3);
-  assert.equal(body.insights.stages[0].value,"technical_interview");
-  assert.equal(body.insights.stages[0].count,2);
+  const stageCounts=Object.fromEntries(body.insights.stages.map(item=>[item.value,item.count]));
+  assert.equal(stageCounts.assignment,2);
+  assert.equal(stageCounts.technical_interview,2);
   assert.equal(body.insights.paymentRequests.reportedYes,1);
   assert.equal(JSON.stringify(body).includes("Private Recruiter"),false);
 });
