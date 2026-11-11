@@ -306,30 +306,33 @@ async function searchR2CompanyIndex(env, query, limit = 12) {
         manifestTokens.add(exact.token);
       }
     }
-    if (manifests.length < tokens.length) {
-      for (const token of tokens) {
-        if (manifestTokens.has(token) || manifests.length >= MAX_R2_PREFIX_MANIFESTS) continue;
-        const listing = await env.COMPANY_INDEX.list({
-          prefix:"index/mca/term/" + token,
-          delimiter:"/",
-          limit:1000
-        });
-        if (listing.truncated) partial = true;
-        const discovered = new Set([
-          ...(listing.delimitedPrefixes || []).map(prefix => String(prefix).split("/")[3]),
-          ...(listing.objects || []).map(item => String(item.key || "").split("/")[3])
-        ].filter(name => name && name.startsWith(token)));
-        for (const candidate of [...discovered].sort()) {
-          if (manifests.length >= MAX_R2_PREFIX_MANIFESTS) {
-            partial = true;
-            break;
-          }
-          if (manifestTokens.has(candidate)) continue;
-          const manifest = await parseR2TokenManifest(env.COMPANY_INDEX, candidate);
-          if (manifest) {
-            manifests.push(manifest);
-            manifestTokens.add(candidate);
-          }
+    // Include longer indexed words beginning with the supplied token as well
+    // (for example, a partial query "infosys" may match "infosystems").
+    for (const token of tokens) {
+      if (manifests.length >= MAX_R2_PREFIX_MANIFESTS) {
+        partial = true;
+        break;
+      }
+      const listing = await env.COMPANY_INDEX.list({
+        prefix:"index/mca/term/" + token,
+        delimiter:"/",
+        limit:1000
+      });
+      if (listing.truncated) partial = true;
+      const discovered = new Set([
+        ...(listing.delimitedPrefixes || []).map(prefix => String(prefix).split("/")[3]),
+        ...(listing.objects || []).map(item => String(item.key || "").split("/")[3])
+      ].filter(name => name && name.startsWith(token)));
+      for (const candidate of [...discovered].sort()) {
+        if (manifests.length >= MAX_R2_PREFIX_MANIFESTS) {
+          partial = true;
+          break;
+        }
+        if (manifestTokens.has(candidate)) continue;
+        const manifest = await parseR2TokenManifest(env.COMPANY_INDEX, candidate);
+        if (manifest) {
+          manifests.push(manifest);
+          manifestTokens.add(candidate);
         }
       }
     }
