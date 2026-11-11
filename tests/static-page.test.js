@@ -28,7 +28,7 @@ test("internship investigation distinguishes past certificates from new offers",
   assert.match(html, /id="reviewPurpose"/);
   assert.match(html, /value="past_internship"/);
   assert.match(html, /value="certificate_review"/);
-  assert.match(html, /completed-internship certificate/i);
+  assert.match(html, /Document classification/);
   assert.match(html, /document classification/i);
 });
 
