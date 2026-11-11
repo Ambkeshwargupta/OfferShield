@@ -20,7 +20,7 @@ try {
 } catch {
   throw new Error("Could not identify the Cloudflare account from the deployment token. Check CLOUDFLARE_API_TOKEN permissions.");
 }
-const accountIds = [...new Set([...whoami.matchAll(/\\|[^|]+\\|\\s*([a-f0-9]{32})\\s*\\|/gi)].map(match => match[1].toLowerCase()))];
+const accountIds = [...new Set([...whoami.matchAll(/\|[^|]+\|\s*([a-f0-9]{32})\s*\|/gi)].map(match => match[1].toLowerCase()))];
 if (accountIds.length !== 1) {
   throw new Error("Could not uniquely read the 32-character Account ID from wrangler whoami.");
 }
