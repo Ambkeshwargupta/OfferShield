@@ -424,7 +424,8 @@ async function route(request, env) {
       }
       result.registry = [...merged.values()];
     }
-    result.registryConfigured = !!(result.registryConfigured || indexed.configured);
+    // Keep the OGD API-key status separate from D1 index availability.
+    // The frontend must not mistake a configured D1 binding for a live OGD key.
     result.nationalIndex = {
       configured:indexed.configured,
       available:indexed.available,
