@@ -24,6 +24,7 @@
     <button data-page="advanced"><span class="ico">⌘</span>Advanced search & intelligence</button>
     <button data-page="companies"><span class="ico">◫</span>Company intelligence</button>
     <button data-page="investigate"><span class="ico">⌕</span>Investigate an offer</button>
+    <button data-page="community"><span class="ico">◉</span>Community intelligence</button>
     <button data-page="reports"><span class="ico">▤</span>Saved investigations</button>
     <button data-page="sources"><span class="ico">↗</span>Source directory</button>
   </nav>
@@ -169,6 +170,72 @@
       <div class="result-box hidden" id="analysisResult"></div>
     </section>
 
+    <section class="page" id="page-community">
+      <div class="page-head"><div><div class="eyebrow">Opt-in student experience network</div><h1>Community Recruitment Intelligence</h1><div class="subhead">Build a better picture of how internships and fresher hiring actually work at startups and small companies. Share only structured details from your own experience; no chats, screenshots or personal data are collected here.</div></div><span class="tag official">Moderated · anonymised</span></div>
+      <div class="grid two">
+        <div class="card">
+          <h3>Contribute your recruitment experience</h3>
+          <p class="small muted">Your submission stays pending and private until reviewed. Approved reports are aggregated with other contributions; individual reports are never displayed publicly.</p>
+          <form id="communityForm">
+            <div class="field"><label for="communityCompany">Company / startup name *</label><input id="communityCompany" maxlength="180" required placeholder="e.g. Acme Technologies"></div>
+            <div class="field"><label for="communityWebsite">Company website (optional)</label><input id="communityWebsite" maxlength="240" placeholder="https://company.in"></div>
+            <div class="form-row">
+              <div class="field"><label for="communityOpportunity">Opportunity type</label><select id="communityOpportunity"><option value="internship">Internship</option><option value="fresher_job">Fresher job</option><option value="apprenticeship">Apprenticeship</option><option value="other">Other</option></select></div>
+              <div class="field"><label for="communityRole">Role area</label><select id="communityRole"><option value="software_it">Software / IT</option><option value="data_ai">Data / AI</option><option value="design_creative">Design / Creative</option><option value="marketing_sales">Marketing / Sales</option><option value="finance_business">Finance / Business</option><option value="operations_hr">Operations / HR</option><option value="engineering_core">Core engineering</option><option value="other">Other / not sure</option></select></div>
+            </div>
+            <div class="form-row">
+              <div class="field"><label for="communityState">State (optional)</label><input id="communityState" maxlength="60" placeholder="e.g. Madhya Pradesh"></div>
+              <div class="field"><label for="communityWorkMode">Work mode</label><select id="communityWorkMode"><option value="not_stated">Not stated</option><option value="remote">Remote</option><option value="hybrid">Hybrid</option><option value="onsite">On-site</option></select></div>
+            </div>
+            <div class="form-row">
+              <div class="field"><label for="communityStipend">Monthly stipend / pay offered</label><select id="communityStipend"><option value="not_stated">Not stated / not sure</option><option value="unpaid">Unpaid</option><option value="under_5000">Below ₹5,000</option><option value="5000_10000">₹5,000–₹10,000</option><option value="10000_20000">₹10,000–₹20,000</option><option value="above_20000">Above ₹20,000</option></select></div>
+              <div class="field"><label for="communityDuration">Duration</label><select id="communityDuration"><option value="not_stated">Not stated / not sure</option><option value="under_1_month">Under 1 month</option><option value="1_3_months">1–3 months</option><option value="3_6_months">3–6 months</option><option value="above_6_months">Above 6 months</option></select></div>
+            </div>
+            <div class="field"><label>Which stages did you personally experience or were told about?</label>
+              <div class="grid two" style="gap:8px;margin-top:8px">
+                <label class="small"><input type="checkbox" name="communityStage" value="application_form"> Application / screening form</label>
+                <label class="small"><input type="checkbox" name="communityStage" value="aptitude_test"> Aptitude test</label>
+                <label class="small"><input type="checkbox" name="communityStage" value="assignment"> Assignment / task</label>
+                <label class="small"><input type="checkbox" name="communityStage" value="technical_interview"> Technical / role interview</label>
+                <label class="small"><input type="checkbox" name="communityStage" value="hr_interview"> HR interview</label>
+                <label class="small"><input type="checkbox" name="communityStage" value="manager_interview"> Manager / founder discussion</label>
+                <label class="small"><input type="checkbox" name="communityStage" value="group_discussion"> Group discussion</label>
+                <label class="small"><input type="checkbox" name="communityStage" value="written_offer"> Written offer</label>
+                <label class="small"><input type="checkbox" name="communityStage" value="background_check"> Background check</label>
+                <label class="small"><input type="checkbox" name="communityStage" value="other"> Other stage</label>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="field"><label for="communityPayment">Were you asked to pay a fee / deposit?</label><select id="communityPayment"><option value="unsure">Not sure / not applicable</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+              <div class="field"><label for="communityOutcome">Your outcome so far</label><select id="communityOutcome"><option value="no_response">No response yet</option><option value="applied">Applied</option><option value="assessment">Assessment</option><option value="interviewed">Interviewed</option><option value="offer_received">Offer received</option><option value="joined">Joined</option><option value="withdrew">Withdrew</option></select></div>
+            </div>
+            <div class="field"><label style="display:flex;gap:9px;align-items:flex-start;font-weight:500"><input id="communityConsent" type="checkbox" style="margin-top:3px;flex:0 0 auto"><span>I confirm this is my own experience and the details are accurate to the best of my knowledge. I consent to this structured, anonymised report being reviewed and, if approved, included in aggregate community patterns and AI analysis context. I have not included personal data.</span></label></div>
+            <div class="form-actions"><button class="btn primary" id="communitySubmitBtn" type="submit">Submit anonymised experience →</button></div>
+          </form>
+          <div id="communitySubmitResult" style="margin-top:12px"></div>
+        </div>
+        <div>
+          <div class="card">
+            <h3>Explore shared recruitment patterns</h3>
+            <p class="small muted">Search for aggregated experiences from this company. We show a pattern only after at least three approved contributions, over the last 12 months.</p>
+            <div class="field"><label for="communitySearchCompany">Company name</label><input id="communitySearchCompany" placeholder="Enter company / startup name"></div>
+            <div class="field"><label for="communitySearchWebsite">Website domain (optional)</label><input id="communitySearchWebsite" placeholder="company.in"></div>
+            <button class="btn primary" id="communitySearchBtn">Explore community patterns →</button>
+            <div id="communityInsightsResult" style="margin-top:14px"><div class="note">Connect and configure the Cloudflare Worker with D1 to enable shared community intelligence.</div></div>
+          </div>
+          <div class="card" style="margin-top:15px">
+            <h3>Delete a contribution</h3>
+            <p class="small muted">Each submission returns a one-time deletion token. Keep it private; it is not recoverable if lost.</p>
+            <div class="field"><label for="communityDeleteId">Report ID</label><input id="communityDeleteId" placeholder="Paste the report ID"></div>
+            <div class="field"><label for="communityDeleteToken">Deletion token</label><input id="communityDeleteToken" type="password" autocomplete="off" placeholder="Paste your 48-character token"></div>
+            <button class="btn danger" id="communityDeleteBtn">Delete my contribution</button>
+          </div>
+        </div>
+      </div>
+      <div class="note" style="margin-top:15px"><strong>How the intelligence improves the analysis:</strong> approved contributions are converted into aggregate stage, stipend, duration, work-mode and outcome patterns. These are retrieved as context for the AI when a student investigates the same company. This is retrieval-based context, not model-weight training or fine-tuning. The AI must label these patterns as community-reported, not employer-confirmed.</div>
+      <div class="note" style="margin-top:9px"><strong>Privacy and safeguards:</strong> This form collects no recruiter names, candidate names, email addresses, phone numbers, chat text, screenshots or free-text allegations. Submissions are held for moderation; only approved aggregates from at least three reports can be shown or used by the AI. A network-based limit reduces spam. Keep your deletion token to remove your submission later.</div>
+    </section>
+
     <section class="page" id="page-reports">
       <div class="page-head"><div><div class="eyebrow">Your investigation history</div><h1>Saved investigations</h1><div class="subhead">Reports are stored in this browser session. Clearing site cookies will make them inaccessible.</div></div><button class="btn" id="refreshReports">↻ Refresh</button></div>
       <div class="reports-list" id="reportsList"><div class="loading">Loading saved investigations…</div></div>
@@ -308,7 +375,7 @@ async function api(path,opts={}){
  if(path.startsWith("/api/reports/")&&method==="DELETE"){const id=path.split("/").pop(),rows=staticReports(),next=rows.filter(r=>r.id!==id);storeStaticReports(next);return {deleted:next.length<rows.length}}
  throw new Error("This feature is not available in the static GitHub Pages edition.");
 }
-function go(page){$$(".page").forEach(p=>p.classList.remove("active"));const el=$("#page-"+page);if(el)el.classList.add("active");$$(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("#crumb").textContent=({overview:"Overview",advanced:"Advanced search & intelligence",companies:"Company intelligence","company-detail":"Company profile",investigate:"Investigate an offer",reports:"Saved investigations","report-detail":"Investigation report",sources:"Source directory",approach:"How evidence works"})[page]||page;$("#sidebar").classList.remove("open");if(page==="reports")loadReports();if(page==="sources")renderSources();if(page==="companies")renderCompanies(companies);if(page==="advanced")refreshWorkerStatus();window.scrollTo({top:0,behavior:"smooth"})}
+function go(page){$$(".page").forEach(p=>p.classList.remove("active"));const el=$("#page-"+page);if(el)el.classList.add("active");$$(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("#crumb").textContent=({overview:"Overview",advanced:"Advanced search & intelligence",companies:"Company intelligence","company-detail":"Company profile",investigate:"Investigate an offer",reports:"Saved investigations",community:"Community intelligence","report-detail":"Investigation report",sources:"Source directory",approach:"How evidence works"})[page]||page;$("#sidebar").classList.remove("open");if(page==="reports")loadReports();if(page==="sources")renderSources();if(page==="companies")renderCompanies(companies);if(page==="advanced")refreshWorkerStatus();window.scrollTo({top:0,behavior:"smooth"})}
 function initials(n){return String(n||"OS").split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()}
 function companyCard(c){const tag=c.isManual?'Manual investigation · not verified':c.isExternal?'Open-data candidate · not verified':'Official-source reference';const klass=c.isManual||c.isExternal?'demo':'official';return '<article class="company-card" data-company="'+esc(c.id)+'"><div class="co-logo">'+esc(initials(c.name))+'</div><div style="min-width:0;flex:1"><h3>'+esc(c.name)+'</h3><p>'+esc(c.sector||"Company reference")+'</p><div class="quick"><span class="tag '+klass+'">'+tag+'</span></div></div><span style="color:#9aa5b7">↗</span></article>'}
 async function init(){try{const [c,s,r]=await Promise.all([api("/api/companies"),api("/api/sources"),api("/api/reports")]);companies=c.companies;sources=s.sources;$("#statCompanies").textContent=companies.length;$("#statSources").textContent=sources.length;$("#statReports").textContent=r.reports.length;$("#homeCompanies").innerHTML=companies.slice(0,4).map(companyCard).join("");$("#companiesGrid").innerHTML=companies.map(companyCard).join("");$("#investigateCompany").innerHTML='<option value="">Choose a company (optional)</option>'+companies.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join("");renderSources();}catch(e){toast(e.message)}}
@@ -537,7 +604,7 @@ async function buildRecruiterChecks(){
 }
 async function testWorkerConnection(){
  if(!workerApiBase()){toast("Paste your Worker URL first.");return}
- try{const data=await workerRequest("/v1/health");$("#workerStatus").textContent="Connected · "+(data.aiConfigured?"AI enabled":"AI not enabled");$("#workerStatus").className="tag "+(data.aiConfigured?"official":"demo");$("#workerApiHint").textContent="MCA OGD key: "+(data.officialOgdConfigured?"configured":"not configured")+" · D1: "+(data.d1Configured?"connected":"not connected")+" · Workers AI: "+(data.aiConfigured?"enabled":"not enabled");toast(data.aiConfigured?"Worker and AI are connected.":"Worker connected, but enable Workers AI for file analysis.")}catch(error){$("#workerStatus").textContent="Connection error";$("#workerStatus").className="tag warning";toast(error.message)}
+ try{const data=await workerRequest("/v1/health");$("#workerStatus").textContent="Connected · "+(data.aiConfigured?"AI enabled":"AI not enabled");$("#workerStatus").className="tag "+(data.aiConfigured?"official":"demo");$("#workerApiHint").textContent="MCA OGD key: "+(data.officialOgdConfigured?"configured":"not configured")+" · D1: "+(data.d1Configured?"connected":"not connected")+" · Community intelligence: "+(data.communityIntelligenceConfigured?"enabled":"D1 required")+" · Workers AI: "+(data.aiConfigured?"enabled":"not enabled");toast(data.aiConfigured?"Worker and AI are connected.":"Worker connected, but enable Workers AI for file analysis.")}catch(error){$("#workerStatus").textContent="Connection error";$("#workerStatus").className="tag warning";toast(error.message)}
 }
 function saveAdvancedReport(){
  const content=$("#advancedSearchResult").innerText+"\n\n"+$("#domainResult").innerText+"\n\n"+$("#headerResult").innerText;
@@ -568,6 +635,7 @@ function resultHTML(r){
    '<div class="analysis-section"><h4>Recruiter details · candidate supplied</h4><div class="analysis-panel"><div class="detail-list">'+[['Recruiter name',rec.name],['Recruiter email',rec.email],['Job source URL',rec.jobSourceUrl]].map(x=>'<div class="detail-row"><span>'+esc(x[0])+'</span><b>'+esc(x[1]||"Not provided")+'</b></div>').join("")+'</div><p class="analysis-meta">These are candidate-provided claims, not verified employment or authority to issue an offer.</p></div></div>'+
    headerHtml+
    '<div class="analysis-section"><h4>Recruitment stages</h4><div class="note">'+(st.stagesFoundInProvidedEvidence?"These stages are explicitly mentioned in the chat/letter you supplied. This is a candidate-provided claim, not independent confirmation from the company.":"No recruitment stages were clearly stated in the supplied evidence. Generic possibilities are shown separately.")+'</div><div class="analysis-grid">'+aiPanel("Stages mentioned in your evidence · not independently verified",st.explicitStages,"No explicit stages were found.")+aiPanel("Typical possible stages · not company-confirmed",st.typicalPossibleStages,"No typical stage suggestions returned.")+'</div><p class="small muted">'+esc(st.note||"Ask the employer for the official selection process.")+'</p></div>'+
+   '<div class="analysis-section"><h4>Community Recruitment Intelligence</h4>'+(r.communityIntelligence?.thresholdMet?'<div class="note">Aggregated from '+esc(r.communityIntelligence.reportCount)+' approved, opt-in community reports over '+esc(r.communityIntelligence.windowDays||365)+' days. These are self-reported patterns, not employer-confirmed hiring policy.</div><div class="analysis-grid">'+aiPanel("Commonly reported stages",(r.communityIntelligence.stages||[]).map(x=>communityStageLabel(x.value)+" · "+x.count+" reports"),"No common stages reported.")+aiPanel("Stipend bands",(r.communityIntelligence.stipendBands||[]).map(x=>x.value+" · "+x.count+" reports"),"No stipend pattern reported.")+aiPanel("Duration bands",(r.communityIntelligence.durationBands||[]).map(x=>x.value+" · "+x.count+" reports"),"No duration pattern reported.")+'</div>':'<div class="note">'+esc(r.communityIntelligence?.note||"No eligible community aggregate was available. This does not imply that no one has experience with this employer.")+'</div>')+'</div>'+
    '<div class="analysis-grid">'+aiPanel("Risk indicators",r.redFlags,"No obvious risk indicator detected. This does not prove authenticity.")+aiPanel("Consistency signals",r.consistencySignals,"No strong consistency signal established.")+aiPanel("Missing information",r.missingInformation,"No additional gaps listed.")+aiPanel("Questions to ask",r.questionsToAsk,"Ask for a written JD, stipend, duration, mentor and official contact.")+aiPanel("Recommended next steps",r.nextSteps,"Cross-check through independently published company channels.")+'</div>'+
    '<div class="analysis-section"><h4>Digital footprint & domain signals</h4>'+(domains?'<div class="analysis-grid">'+domains+'</div>':'<p class="small muted">No company/recruiter domain available for this scan.</p>')+'<div class="note" style="margin-top:10px">Search links are discovery routes; their results are not automatically verified.</div><div class="analysis-links">'+links+'</div></div>'+
    '<div class="analysis-section"><h4>Uploaded evidence</h4><div class="quick">'+(files||'<span class="small muted">No files uploaded.</span>')+'</div>'+processingWarnings+'<p class="analysis-meta">'+esc(r.privacy?.note||"Original files are not included in saved reports.")+'</p></div>'+
@@ -581,6 +649,65 @@ function renderOfferFileList(){
  if(!files.length){box.innerHTML='<span class="small muted">No files selected. Screenshots of chats and offer letters can be added here.</span>';return}
  const total=files.reduce((sum,file)=>sum+file.size,0);
  box.innerHTML=files.map(file=>'<span class="file-chip">▤ '+esc(file.name)+' · '+(file.size/1024/1024).toFixed(2)+' MB</span>').join("")+'<span class="small muted" style="align-self:center">'+files.length+' file(s) · '+(total/1024/1024).toFixed(2)+' MB</span>';
+}
+
+function communityStageLabel(value){
+ const labels={application_form:"Application / screening form",aptitude_test:"Aptitude test",assignment:"Assignment / task",technical_interview:"Technical / role interview",hr_interview:"HR interview",manager_interview:"Manager / founder discussion",group_discussion:"Group discussion",written_offer:"Written offer",background_check:"Background check",other:"Other stage"};
+ return labels[value]||value;
+}
+async function submitCommunityReport(event){
+ event.preventDefault();
+ if(!workerApiBase()){toast("Connect your Cloudflare Worker first. Community submissions need the D1 database.");return}
+ if(!$("#communityConsent").checked){toast("Please confirm the consent and own-experience statement.");return}
+ const companyName=$("#communityCompany").value.trim();
+ if(companyName.length<2){toast("Enter the company name.");return}
+ const btn=$("#communitySubmitBtn");btn.disabled=true;btn.textContent="Submitting for moderation…";
+ const payload={
+  companyName,website:$("#communityWebsite").value.trim(),
+  opportunityType:$("#communityOpportunity").value,roleCategory:$("#communityRole").value,
+  state:$("#communityState").value.trim(),workMode:$("#communityWorkMode").value,
+  stipendBand:$("#communityStipend").value,durationBand:$("#communityDuration").value,
+  stages:$('input[name="communityStage"]:checked').map(x=>x.value),
+  paymentRequest:$("#communityPayment").value,outcome:$("#communityOutcome").value,
+  consent:true,selfReport:true,consentVersion:"community-v1"
+ };
+ try{
+  const data=await workerRequest("/v1/community/reports",{method:"POST",body:JSON.stringify(payload)});
+  $("#communitySubmitResult").innerHTML='<div class="note"><strong>Contribution received · pending moderation</strong><p>'+esc(data.note||"Your report is queued for review.")+'</p><div class="detail-list"><div class="detail-row"><span>Report ID</span><b><code>'+esc(data.reportId)+'</code></b></div><div class="detail-row"><span>One-time deletion token</span><b style="word-break:break-all"><code>'+esc(data.deletionToken)+'</code></b></div></div><button class="btn" id="copyCommunityDelete">Copy deletion details</button></div>';
+  $("#copyCommunityDelete").onclick=async()=>{const text="Report ID: "+data.reportId+"\nDeletion token: "+data.deletionToken;try{await navigator.clipboard.writeText(text);toast("Deletion details copied. Keep them private.")}catch{toast("Copy not available; manually save the report ID and token.")}};
+  $("#communityDeleteId").value=data.reportId;$("#communityDeleteToken").value="";
+  $("#communityConsent").checked=false;
+  toast("Your contribution is waiting for moderation.");
+ }catch(error){$("#communitySubmitResult").innerHTML='<div class="note">'+esc(error.message)+'</div>';toast(error.message)}
+ finally{btn.disabled=false;btn.textContent="Submit anonymised experience →"}
+}
+function renderCommunityInsights(data){
+ const box=$("#communityInsightsResult"),d=data?.insights||{};
+ if(!d.configured){box.innerHTML='<div class="note">Community intelligence is not enabled because the Worker has no D1 binding. Create and bind the D1 database, then apply the 0003 migration.</div>';return}
+ if(!d.thresholdMet){box.innerHTML='<div class="note"><strong>Not enough moderated data yet.</strong><p>'+esc(d.note||"A minimum of three approved contributions is required.")+'</p><p class="small muted">'+esc(d.reportCount||0)+' approved contribution(s) found · '+esc(d.minReports||3)+' required.</p></div>';return}
+ const rows=(items)=>Array.isArray(items)&&items.length?'<div class="detail-list">'+items.map(x=>'<div class="detail-row"><span>'+esc(communityStageLabel(x.value))+'</span><b>'+esc(x.count)+' report(s)</b></div>').join("")+'</div>':'<p class="small muted">No shared pattern recorded.</p>';
+ const stages=rows(d.stages),stipends=rows(d.stipendBands),durations=rows(d.durationBands),modes=rows(d.workModes),outcomes=rows(d.outcomes);
+ const payment=d.paymentRequests||{};
+ box.innerHTML='<div class="note"><strong>Aggregated community pattern · '+esc(d.reportCount)+' approved reports</strong><p>Last '+esc(d.windowDays||365)+' days · at least three reports · self-reported and moderator-reviewed.</p></div><div class="analysis-grid" style="margin-top:10px"><div class="analysis-panel"><h4>Reported recruitment stages</h4>'+stages+'</div><div class="analysis-panel"><h4>Reported stipend bands</h4>'+stipends+'</div><div class="analysis-panel"><h4>Reported duration</h4>'+durations+'</div><div class="analysis-panel"><h4>Work modes</h4>'+modes+'</div><div class="analysis-panel"><h4>Reported outcomes</h4>'+outcomes+'</div><div class="analysis-panel"><h4>Payment requests reported</h4><p><strong>'+esc(payment.reportedYes||0)+'</strong> yes · <strong>'+esc(payment.reportedUnsure||0)+'</strong> unsure of '+esc(payment.total||d.reportCount)+' contributions</p><p class="analysis-meta">Community self-reports, not a finding of misconduct.</p></div></div><p class="analysis-meta" style="margin-top:10px">'+esc(d.note||"Community submissions are not employer-confirmed.")+'</p>';
+}
+async function loadCommunityInsights(){
+ const companyName=$("#communitySearchCompany").value.trim(),website=$("#communitySearchWebsite").value.trim();
+ if(!companyName&&!website){toast("Enter a company name or domain.");return}
+ if(!workerApiBase()){toast("Connect the Cloudflare Worker first.");return}
+ const box=$("#communityInsightsResult");box.innerHTML='<div class="loading">Looking for approved aggregate patterns…</div>';
+ try{const query=new URLSearchParams({companyName,website});const data=await workerRequest("/v1/community/insights?"+query.toString());renderCommunityInsights(data)}
+ catch(error){box.innerHTML='<div class="note">'+esc(error.message)+'</div>';toast(error.message)}
+}
+async function deleteCommunityReport(){
+ const id=$("#communityDeleteId").value.trim(),token=$("#communityDeleteToken").value.trim();
+ if(!id||!token){toast("Enter both the report ID and deletion token.");return}
+ if(!workerApiBase()){toast("Connect the Cloudflare Worker first.");return}
+ if(!window.confirm("Permanently delete this community contribution?"))return;
+ try{
+  const data=await workerRequest("/v1/community/reports/"+encodeURIComponent(id),{method:"DELETE",body:JSON.stringify({deletionToken:token})});
+  $("#communityDeleteId").value="";$("#communityDeleteToken").value="";
+  $("#communitySubmitResult").innerHTML="";toast(data.note||"Contribution deleted.");
+ }catch(error){toast(error.message)}
 }
 async function runAnalysis(){
  const text=$("#offerText").value.trim(),companyId=$("#investigateCompany").value,selected=$("#investigateCompany").selectedOptions[0]?.textContent||"";
@@ -678,6 +805,9 @@ $("#offerFiles").addEventListener("change",renderOfferFileList);
 $("#analyseBtn").onclick=runAnalysis;
 $("#sampleBtn").onclick=()=>{$("#investigateCompany").value="tcs";$("#reportTitle").value="Synthetic demo — internship message domain comparison";$("#offerText").value="Subject: Internship Selection — Tata Consultancy Services\n\nCongratulations! You have been shortlisted for the Software Development Intern role at Tata Consultancy Services.\n\nPlease continue your onboarding at https://tcs-careers.example/apply and contact recruiter@tcs-careers.example for the next steps.\n\nThis is a fictional training example using the reserved .example domain. It is not a real company communication.";toast("Synthetic example loaded. It does not describe a real employer message.")};
 $("#clearBtn").onclick=()=>{$("#offerText").value="";$("#reportTitle").value="";$("#offerCompanyName").value="";$("#offerWebsite").value="";$("#offerRole").value="";$("#offerCompanyState").value="";$("#offerCompanyDistrict").value="";$("#offerRecruiter").value="";$("#offerRecruiterEmail").value="";$("#offerSourceUrl").value="";$("#offerFiles").value="";$("#offerConsent").checked=false;renderOfferFileList();$("#analysisResult").classList.add("hidden");lastAnalysis=null;lastInput=""};
+$("#communityForm").addEventListener("submit",submitCommunityReport);
+$("#communitySearchBtn").onclick=loadCommunityInsights;
+$("#communityDeleteBtn").onclick=deleteCommunityReport;
 $("#refreshReports").onclick=loadReports;$("#printReport").onclick=()=>window.print();
 $("#mobileMenu").onclick=()=>$("#sidebar").classList.toggle("open");
 $$(".nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.page)));
