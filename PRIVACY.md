@@ -41,3 +41,10 @@ Each submitter receives a one-time deletion token. Only its SHA-256 hash is stor
 Approved aggregate community patterns are retrieved as context for the AI investigation. This is retrieval-based grounding, not fine-tuning or a change to the model's weights. These patterns are self-reported and moderator-reviewed, not employer-confirmed facts. The public result includes the sample count and time window and does not expose a report-level feed.
 
 Do not submit information about another person, personal identifiers, confidential employer documents or anything you are not authorised to share. The company name/domain identifies the subject of the experience and is retained for aggregation. Review and publish a community-specific retention/deletion policy and moderation contact before broad public launch.
+
+
+## Public digital-footprint search
+
+When the optional `TAVILY_API_KEY` is configured, the Worker sends the company name, the student-supplied company website/domain, and an optional recruiter name to Tavily Search to retrieve public, indexed web pages. It does not send uploaded offer letters, screenshots, pasted chats or recruiter email addresses to Tavily. Search results (titles, URLs, short public snippets, query categories and published dates when available) are returned to the student's investigation report and cached in Cloudflare D1 for up to 12 hours.
+
+OfferShield uses the search API's public index; it does not scrape logged-in LinkedIn pages, access private profiles, or call a private LinkedIn recruiter database. A LinkedIn page found in public search is not represented as LinkedIn-verified. Public search snippets can be stale, incomplete, manipulated or about similarly named companies. Students should open sources themselves and distinguish employer-owned pages from independent sources.
