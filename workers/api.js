@@ -693,7 +693,7 @@ async function analyseInternshipUpload(request, env, origin) {
       if (item && item.format === "error") return "[Could not extract " + cleanText(item.name,100) + "]";
       return "[Evidence file: " + cleanText(item && item.name,100) + "]\n" + cleanText(item && item.data,9000);
     }).join("\n\n").slice(0,28000);
-    var documentProcessingWarnings = list
+    documentProcessingWarnings = list
       .filter(item => !item || item.format === "error" || !String(item.data || "").trim())
       .map(item => cleanText(item && item.name,100) + ": text extraction was incomplete or returned no text.")
       .filter(Boolean);
