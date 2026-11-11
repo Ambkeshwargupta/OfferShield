@@ -1,33 +1,21 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
+import { readFile, writeFile, appendFile } from "node:fs/promises";
 
 const databaseName = "offershield-intelligence";
 const configPath = "workers/wrangler.toml";
 const configuredAccountId = (process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
 const token = process.env.CLOUDFLARE_API_TOKEN;
-
+// This is the Account ID in the Cloudflare dashboard URL where the user created
+// the offershield-company-index R2 bucket and deployed the Worker.
+const verifiedAccountId = "66f8e560965223a9f0b85a2c5a0a8892";
 if (!token) throw new Error("CLOUDFLARE_API_TOKEN is required.");
-
-// Derive the account identifier from the authenticated token, so a copied
-// account name or zone ID in the optional GitHub secret cannot misroute D1 calls.
-let whoami;
-try {
-  whoami = execFileSync("wrangler", ["whoami"], {
-    encoding: "utf8",
-    env: process.env,
-    stdio: ["ignore", "pipe", "pipe"]
-  });
-} catch {
-  throw new Error("Could not identify the Cloudflare account from the deployment token. Check CLOUDFLARE_API_TOKEN permissions.");
+if (configuredAccountId !== verifiedAccountId) {
+  console.log("Using the Account ID from the confirmed Cloudflare R2 dashboard for this deployment.");
 }
-const accountIds = [...new Set([...whoami.matchAll(/\|[^|]+\|\s*([a-f0-9]{32})\s*\|/gi)].map(match => match[1].toLowerCase()))];
-if (accountIds.length !== 1) {
-  throw new Error("Could not uniquely read the 32-character Account ID from wrangler whoami.");
+// Correct the value for later steps (Wrangler deploy and secret upload) as well.
+if (process.env.GITHUB_ENV) {
+  await appendFile(process.env.GITHUB_ENV, "CLOUDFLARE_ACCOUNT_ID=" + verifiedAccountId + "\\n");
 }
-const accountId = accountIds[0];
-if (configuredAccountId && configuredAccountId !== accountId) {
-  console.log("The CLOUDFLARE_ACCOUNT_ID secret did not match the authenticated account; using the account ID returned by Wrangler.");
-}
+const accountId = verifiedAccountId;
 
 async function cloudflareApi(path, options = {}) {
   const response = await fetch("https://api.cloudflare.com/client/v4" + path, {
