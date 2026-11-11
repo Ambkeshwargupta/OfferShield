@@ -418,7 +418,7 @@ async function route(request, env) {
     const result = await resolveSearch(query,env);
     if (indexed.records.length) {
       const merged = new Map();
-      for (const record of [...indexed.records, ...(result.registry || [])]) {
+      for (const record of [...indexed.records.map(record => companyResponse(record)), ...(result.registry || [])]) {
         const key = String(record.identifier || record.name || "").toUpperCase();
         if (key && !merged.has(key)) merged.set(key, record);
       }
