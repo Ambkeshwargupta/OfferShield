@@ -25,7 +25,7 @@ See [workers/README.md](workers/README.md).
 9. Copy the Worker URL into OfferShield → Advanced Search & Intelligence → API connection.
 10. Test the API status badge. It should report Workers AI enabled before trying screenshot/PDF analysis; then test a company lookup, domain scan and header parse.
 
-The GitHub Actions deployment requires repository secrets CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and DATA_GOV_API_KEY. Create the Cloudflare token with Workers Scripts Edit permission and the required R2 permissions for the offershield-company-index binding. Add secrets at https://github.com/Ambkeshwargupta/OfferShield/settings/secrets/actions. The MCA OGD connector is available only when a data.gov.in key is configured. Udyam regional enterprise discovery uses the OGD resource; exact certificate verification remains manual. AI internship/offer uploads require the Workers AI binding and are usage-metered. D1 caching/rate limiting require the D1 binding.
+The GitHub Actions deployment requires repository secrets CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and DATA_GOV_API_KEY. Create a Cloudflare account API token using the Edit Cloudflare Workers permission policy. The offershield-company-index R2 bucket must already exist, but the Worker deployment token does not need separate R2 data access just to deploy the binding. Add secrets at https://github.com/Ambkeshwargupta/OfferShield/settings/secrets/actions. The MCA OGD connector is available only when a data.gov.in key is configured. Udyam regional enterprise discovery uses the OGD resource; exact certificate verification remains manual. AI internship/offer uploads require the Workers AI binding and are usage-metered. D1 caching/rate limiting require the D1 binding.
 
 ## C. Local Node prototype
 
