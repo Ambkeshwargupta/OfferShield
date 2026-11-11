@@ -248,6 +248,61 @@ async function wikidataSearch(query) {
     }));
   } catch { return []; }
 }
+function companyIndexQuery(query) {
+  const tokens = String(query || "").toLowerCase()
+    .normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "")
+    .match(/[a-z0-9]+/g) || [];
+  return [...new Set(tokens)].filter(token => token.length >= 2).slice(0, 6);
+}
+
+async function searchNationalCompanyIndex(env, query, limit = 12) {
+  if (!env.DB) return { configured:false, available:false, records:[], strategy:"d1_not_configured" };
+  const identifier = classifyIdentifier(query);
+  try {
+    let result;
+    let strategy;
+    if (identifier.type === "CIN" || identifier.type === "LLPIN") {
+      result = await env.DB.prepare(
+        "SELECT cin,name,status,company_class,category,sub_category,registration_date,state,roc,authorized_capital,paid_up_capital,registered_office,listing_status,industrial_classification,source_updated_at FROM companies WHERE cin=? LIMIT ?"
+      ).bind(identifier.value, limit).all();
+      strategy = "exact_registration_identifier";
+    } else {
+      const tokens = companyIndexQuery(query);
+      if (!tokens.length) return { configured:true, available:true, records:[], strategy:"no_searchable_tokens" };
+      const match = tokens.map(token => '"' + token.replace(/"/g, '""') + '"*').join(" AND ");
+      result = await env.DB.prepare(
+        "SELECT c.cin,c.name,c.status,c.company_class,c.category,c.sub_category,c.registration_date,c.state,c.roc,c.authorized_capital,c.paid_up_capital,c.registered_office,c.listing_status,c.industrial_classification,c.source_updated_at FROM companies_fts f JOIN companies c ON c.rowid=f.rowid WHERE companies_fts MATCH ? ORDER BY bm25(companies_fts), c.name LIMIT ?"
+      ).bind(match, limit).all();
+      strategy = "fts5_all_tokens_prefix";
+      if (!(result.results || []).length) {
+        const normalized = tokens.join(" ");
+        result = await env.DB.prepare(
+          "SELECT cin,name,status,company_class,category,sub_category,registration_date,state,roc,authorized_capital,paid_up_capital,registered_office,listing_status,industrial_classification,source_updated_at FROM companies WHERE name_normalized LIKE ? ORDER BY name_normalized LIMIT ?"
+        ).bind(normalized + "%", limit).all();
+        strategy = "normalized_name_prefix";
+      }
+    }
+    const records = (result.results || []).map(row => ({
+      identifier:row.cin, name:row.name, status:row.status, class:row.company_class,
+      category:row.category, subCategory:row.sub_category, registrationDate:row.registration_date,
+      state:row.state, roc:row.roc, authorizedCapital:row.authorized_capital,
+      paidUpCapital:row.paid_up_capital, registeredOffice:row.registered_office,
+      listingStatus:row.listing_status, industrialClassification:row.industrial_classification,
+      sourceUpdatedAt:row.source_updated_at, source:"MCA Company Master Data (local indexed snapshot)",
+      sourceUrl:"https://www.data.gov.in/catalog/company-master-data"
+    }));
+    return { configured:true, available:true, records, strategy };
+  } catch (error) {
+    // A database may already be bound while the new index migration has not
+    // yet been applied. Keep the pre-existing exact API/Wikidata path usable.
+    return {
+      configured:true, available:false, records:[],
+      strategy:"company_index_not_ready",
+      message:"The national company index is not ready. Apply workers/migrations/0002_national_company_index.sql."
+    };
+  }
+}
+
 function companyResponse(record, evidenceStatus = "official_dataset_record") {
   return {
     ...record,
@@ -359,7 +414,24 @@ async function route(request, env) {
   if (request.method === "GET" && url.pathname === "/v1/search") {
     const query = cleanText(url.searchParams.get("q"),120).trim();
     if (query.length < 2) return jsonError("Enter at least two characters.",400,origin);
+    const indexed = await searchNationalCompanyIndex(env, query, 12);
     const result = await resolveSearch(query,env);
+    if (indexed.records.length) {
+      const merged = new Map();
+      for (const record of [...indexed.records, ...(result.registry || [])]) {
+        const key = String(record.identifier || record.name || "").toUpperCase();
+        if (key && !merged.has(key)) merged.set(key, record);
+      }
+      result.registry = [...merged.values()];
+    }
+    result.registryConfigured = !!(result.registryConfigured || indexed.configured);
+    result.nationalIndex = {
+      configured:indexed.configured,
+      available:indexed.available,
+      indexedMatches:indexed.records.length,
+      strategy:indexed.strategy,
+      message:indexed.message || null
+    };
     return response(result,200,origin);
   }
   if (request.method === "GET" && url.pathname === "/v1/udyam/search") {
@@ -410,6 +482,7 @@ async function route(request, env) {
     return response({
       capabilities:[
         {id:"mca_ogd",name:"MCA company master data via data.gov.in",configured:!!env.DATA_GOV_API_KEY,mode:env.DATA_GOV_API_KEY?"Live API connector":"Requires free data.gov.in API key",coverage:"Company/LLP master snapshot; not live MCA portal data"},
+        {id:"mca_national_index",name:"National MCA full-text company index",configured:!!env.DB,mode:env.DB?"Requires 0002 migration and bulk data import":"Requires D1 binding, migration and bulk data import",coverage:"Searches imported MCA company master data locally using FTS5; coverage is limited to the snapshot actually imported"},
         {id:"udyam_ogd",name:"MSME registered units under UDYAM via data.gov.in",configured:!!env.DATA_GOV_API_KEY,mode:env.DATA_GOV_API_KEY?"Live API connector; State and District required":"Requires DATA_GOV_API_KEY secret",coverage:"EnterpriseName, State, District, Pincode, RegistrationDate, CommunicationAddress and Activities. Udyam Registration Number is not exposed by this resource."},
         {id:"wikidata",name:"Wikidata company discovery",configured:true,mode:"Public API",coverage:"Third-party discovery candidates only"},
         {id:"dns",name:"DNS email and domain checks",configured:true,mode:"Google Public DNS-over-HTTPS",coverage:"A, AAAA, MX, TXT, NS and DMARC TXT records"},
