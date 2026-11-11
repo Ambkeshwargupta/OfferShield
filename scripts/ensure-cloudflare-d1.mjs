@@ -1,21 +1,15 @@
-import { readFile, writeFile, appendFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 
 const databaseName = "offershield-intelligence";
 const configPath = "workers/wrangler.toml";
-const configuredAccountId = (process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+const accountId = (process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
 const token = process.env.CLOUDFLARE_API_TOKEN;
-// This is the Account ID in the Cloudflare dashboard URL where the user created
-// the offershield-company-index R2 bucket and deployed the Worker.
-const verifiedAccountId = "66f8e560965223a9f0b85a2c5a0a8892";
+
 if (!token) throw new Error("CLOUDFLARE_API_TOKEN is required.");
-if (configuredAccountId !== verifiedAccountId) {
-  console.log("Using the Account ID from the confirmed Cloudflare R2 dashboard for this deployment.");
+if (!/^[a-f0-9]{32}$/i.test(accountId)) {
+  throw new Error("CLOUDFLARE_ACCOUNT_ID must be the 32-character Account ID from the Cloudflare dashboard URL / Account Details.");
 }
-// Correct the value for later steps (Wrangler deploy and secret upload) as well.
-if (process.env.GITHUB_ENV) {
-  await appendFile(process.env.GITHUB_ENV, "CLOUDFLARE_ACCOUNT_ID=" + verifiedAccountId + "\n");
-}
-const accountId = verifiedAccountId;
+console.log("Using the CLOUDFLARE_ACCOUNT_ID repository secret for D1 provisioning.");
 
 async function cloudflareApi(path, options = {}) {
   const response = await fetch("https://api.cloudflare.com/client/v4" + path, {
