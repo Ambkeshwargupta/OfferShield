@@ -815,6 +815,7 @@ async function analyseInternshipUpload(request, env, origin) {
     missingInformation:Array.isArray(analysis.missingInformation)?analysis.missingInformation.slice(0,10):[],
     questionsToAsk:Array.isArray(analysis.questionsToAsk)?analysis.questionsToAsk.slice(0,8):[],
     nextSteps:Array.isArray(analysis.nextSteps)?analysis.nextSteps.slice(0,8):[],
+    recruiterProvided:{name:recruiterName,email:recruiterEmail,jobSourceUrl},
     extracted:{emails:emailMatches,urls,domains,phones:[...new Set(evidence.match(/(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}\b/g)||[])],paymentSignals:paymentLines},
     domainChecks,digitalFootprintSearches:searchLinks,
     uploadedEvidence:fileInfo.map(x=>({name:x.name,type:x.type,bytes:x.bytes,processed:true})),
