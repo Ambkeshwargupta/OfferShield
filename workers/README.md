@@ -178,11 +178,11 @@ Open the repository's [Actions secrets](https://github.com/Ambkeshwargupta/Offer
 | Secret name | Value |
 |---|---|
 | `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with permission to deploy Workers and access the R2 binding |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare account API token with the Edit Cloudflare Workers permission policy |
 | `R2_ACCESS_KEY_ID` | R2 S3 Access Key ID |
 | `R2_SECRET_ACCESS_KEY` | R2 S3 Secret Access Key |
 
-The existing `DATA_GOV_API_KEY` repository secret is reused. No key is written to the repository, downloaded dataset, index manifest or workflow output. The Cloudflare API token is used only by the separate Worker deployment workflow; the R2 S3 credentials are used only to upload objects.
+The existing `DATA_GOV_API_KEY` repository secret is reused. No key is written to the repository, downloaded dataset, index manifest or workflow output. The Cloudflare API token is used by the separate Worker deployment workflow. The R2 S3 credentials are used only for direct object-storage operations in the full national-index import. Create the R2 bucket before Worker deployment; deploying an R2 binding itself does not require R2 object-list/read/write credentials.
 
 #### 4. Deploy the Worker with the R2 binding
 
