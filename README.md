@@ -46,7 +46,7 @@ OfferShield is an India-first company and recruitment due-diligence platform foc
 - DNS-over-HTTPS and RDAP lookups.
 - Email header parser.
 - AI-assisted internship/offer investigation endpoint (POST /v1/investigate) using Workers AI Markdown Conversion and Llama 3.3 70B JSON-mode inference.
-- Screenshot/document evidence extraction, domain DNS/RDAP signals, MCA indexed-name lookup and structured student-facing assessment.
+- Screenshot/document evidence extraction, domain DNS/RDAP and pasted email-header clues, MCA indexed-name/CIN lookup, regional Udyam enterprise discovery and Wikidata candidates, plus structured student-facing assessment.
 - D1-backed API response cache and rate limit buckets when D1 is configured.
 
 ## Run the Node prototype locally
