@@ -14,7 +14,7 @@ This API is separate from GitHub Pages. GitHub Pages hosts the static premium we
 - Domain intelligence: A, AAAA, MX, TXT, NS and DMARC DNS records.
 - Public RDAP registration-data lookup.
 - Original email-header parsing: From, Reply-To, Return-Path, Authentication-Results and DKIM selector/domain extraction; optional comparison against a company-published domain.
-- AI-assisted student internship and offer review through POST /v1/investigate: accepts pasted chat/offer text and PDF, DOCX, ODT, HTML, XML, PNG, JPG or WEBP screenshots/documents (up to five files and 12 MB combined).
+- AI-assisted student internship and offer review through POST /v1/investigate: accepts pasted chat/offer text and PDF, DOCX, ODT, HTML, XML, PNG, JPG or WEBP screenshots/documents (up to five files and 12 MB combined). Supported formats include PDF, common image formats (PNG/JPG/WEBP/GIF/BMP/SVG), DOCX, XLS/XLSX, ODS/ODT, CSV, NUMBERS, HTML and XML. TXT/EML content can be pasted into the message field.
 - Uses env.AI.toMarkdown() to extract document/screenshot content and Workers AI Llama 3.3 70B JSON mode to return offer terms, stages explicitly mentioned in the student's evidence, typical possible stages (separately labelled), risk indicators, consistency signals, missing details, questions and next steps.
 - Checks at most one primary candidate-provided domain per investigation plus MCA indexed-name evidence when available; returns public search routes for company/recruiter footprint follow-up.
 - Company-published recruitment/fraud contact lookup from the D1 source register.
