@@ -222,6 +222,16 @@ test("company name search uses the R2 national MCA token index",async()=>{
     const url=new URL(input);
     if(url.hostname==="dns.google") return new Response(JSON.stringify({Status:0,Answer:[]}),{status:200,headers:{"content-type":"application/json"}});
     if(url.hostname==="rdap.org") return new Response(JSON.stringify({ldhName:"example-startup.in",status:[],events:[],entities:[]}),{status:200,headers:{"content-type":"application/json"}});
+    if(url.hostname==="www.data.gov.in") return new Response(JSON.stringify({
+      total:1,count:1,records:[{
+        LG_ST_Code:"23",State:"Madhya Pradesh",LG_DT_Code:"466",District:"Indore",
+        Pincode:"452001",RegistrationDate:"2024-05-30",EnterpriseName:"EXAMPLE STARTUP",
+        CommunicationAddress:"Indore, Madhya Pradesh",Activities:"Software development"
+      }]
+    }),{status:200,headers:{"content-type":"application/json"}});
+    if(url.hostname==="www.wikidata.org") return new Response(JSON.stringify({
+      search:[{id:"Q123",label:"Example Startup",description:"software company"}]
+    }),{status:200,headers:{"content-type":"application/json"}});
     return new Response(JSON.stringify({search:[]}),{status:200,headers:{"content-type":"application/json"}});
   };
   try {
@@ -336,6 +346,8 @@ test("AI internship review parses uploaded files and separates claimed stages fr
   form.set("companyName","Example Startup");
   form.set("recruiterName","Alex Recruiter");
   form.set("recruiterEmail","alex@example-startup.in");
+  form.set("state","Madhya Pradesh");
+  form.set("district","Indore");
   form.set("messageText","Please review this internship opportunity.");
   form.append("files",new File([Buffer.from("synthetic PDF fixture")],"internship-offer.pdf",{type:"application/pdf"}),"internship-offer.pdf");
 
@@ -350,7 +362,7 @@ test("AI internship review parses uploaded files and separates claimed stages fr
   try {
     response=await worker.fetch(
       new Request("https://api.example.workers.dev/v1/investigate",{method:"POST",body:form}),
-      env({AI:ai}),ctx
+      env({AI:ai,DATA_GOV_API_KEY:"test-data-gov-key"}),ctx
     );
   } finally {
     globalThis.fetch=originalFetch;
@@ -367,6 +379,9 @@ test("AI internship review parses uploaded files and separates claimed stages fr
   assert.equal(body.recruitmentStages.companyStagesConfirmed,false);
   assert.equal(body.recruiterProvided.name,"Alex Recruiter");
   assert.equal(body.recruiterProvided.email,"alex@example-startup.in");
+  assert.equal(body.company.udyamMatches[0].enterpriseName,"EXAMPLE STARTUP");
+  assert.equal(body.company.udyamSearch.pagesChecked,1);
+  assert.equal(body.company.publicDiscovery[0].id,"Q123");
   assert.equal(body.uploadedEvidence.length,1);
   assert.equal(body.privacy.filesPersisted,false);
 });
