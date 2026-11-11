@@ -6,6 +6,7 @@ workers_dev = true
 [vars]
 APP_NAME = "OfferShield Intelligence API"
 DATA_GOV_UDYAM_RESOURCE_ID = "8b68ae56-84cf-4728-a0a6-1be11028dea7"
+DATA_GOV_API_BASE_URL = "https://www.data.gov.in/backend/dataapi/v1/resource/"
 ALLOWED_ORIGINS = "https://ambkeshwargupta.github.io,http://localhost:3000,http://127.0.0.1:3000"
 
 # Create a D1 database, then replace the placeholder database_id and uncomment:
