@@ -161,6 +161,7 @@
           <small>Supports PDF, DOCX, XLSX/XLS/ODS, CSV, ODT, HTML/XML and screenshots/images (PNG/JPG/WEBP/GIF/BMP/SVG). Up to 5 files and 12 MB combined. Paste TXT/EML content into the message box.</small>
           <div id="offerFileList" class="file-list"><span class="small muted">No files selected. Screenshots of chats and offer letters can be added here.</span></div>
         </div>
+        <div class="field" style="margin-top:14px"><label style="display:flex;gap:9px;align-items:flex-start;font-weight:500"><input id="offerConsent" type="checkbox" style="margin-top:3px;flex:0 0 auto"><span>I understand that the pasted evidence and selected files will be sent to my connected Cloudflare Worker and Workers AI for this review. I have permission to share this material and have removed unrelated personal or sensitive data.</span></label></div>
         <div class="form-actions"><button class="btn primary" id="analyseBtn">Analyse company & evidence →</button><button class="btn" id="sampleBtn">Load synthetic demo example</button><button class="btn ghost" id="clearBtn">Clear</button></div>
         <div class="note" style="margin-top:17px"><strong>Privacy:</strong> Uploaded files are sent to your connected Cloudflare Worker and Workers AI for this analysis; OfferShield does not save the original files. The saved report contains the analysis, not the file bytes. Do not upload Aadhaar, PAN, bank details, passwords or unrelated personal documents. Check the privacy terms of your own Worker/account before using real candidate data.</div>
         <div class="note" style="margin-top:10px"><strong>Important:</strong> AI cannot certify an offer as genuine. A valid MCA record proves only that a legal-entity record exists. It does not prove that the recruiter works there or that the vacancy is authorised. Company-specific hiring stages are shown as confirmed only when the supplied evidence explicitly states them.</div>
@@ -587,6 +588,7 @@ async function runAnalysis(){
  if(files.length>5){toast("Upload no more than five files.");return}
  if(total>12*1024*1024){toast("Keep the combined upload below 12 MB.");return}
  if(!text&&!companyName&&!files.length){toast("Enter a company name, paste the message or upload evidence.");return}
+ if(workerApiBase()&&!$("#offerConsent").checked){toast("Please review and accept the evidence-processing notice before sending data to Workers AI.");return}
  const btn=$("#analyseBtn");btn.disabled=true;btn.textContent="Reading evidence & checking sources…";
  try{
   lastInput=text;
@@ -674,7 +676,7 @@ async function filterCompanies(){
 $("#offerFiles").addEventListener("change",renderOfferFileList);
 $("#analyseBtn").onclick=runAnalysis;
 $("#sampleBtn").onclick=()=>{$("#investigateCompany").value="tcs";$("#reportTitle").value="Synthetic demo — internship message domain comparison";$("#offerText").value="Subject: Internship Selection — Tata Consultancy Services\n\nCongratulations! You have been shortlisted for the Software Development Intern role at Tata Consultancy Services.\n\nPlease continue your onboarding at https://tcs-careers.example/apply and contact recruiter@tcs-careers.example for the next steps.\n\nThis is a fictional training example using the reserved .example domain. It is not a real company communication.";toast("Synthetic example loaded. It does not describe a real employer message.")};
-$("#clearBtn").onclick=()=>{$("#offerText").value="";$("#reportTitle").value="";$("#offerCompanyName").value="";$("#offerWebsite").value="";$("#offerRole").value="";$("#offerCompanyState").value="";$("#offerCompanyDistrict").value="";$("#offerRecruiter").value="";$("#offerRecruiterEmail").value="";$("#offerSourceUrl").value="";$("#offerFiles").value="";renderOfferFileList();$("#analysisResult").classList.add("hidden");lastAnalysis=null;lastInput=""};
+$("#clearBtn").onclick=()=>{$("#offerText").value="";$("#reportTitle").value="";$("#offerCompanyName").value="";$("#offerWebsite").value="";$("#offerRole").value="";$("#offerCompanyState").value="";$("#offerCompanyDistrict").value="";$("#offerRecruiter").value="";$("#offerRecruiterEmail").value="";$("#offerSourceUrl").value="";$("#offerFiles").value="";$("#offerConsent").checked=false;renderOfferFileList();$("#analysisResult").classList.add("hidden");lastAnalysis=null;lastInput=""};
 $("#refreshReports").onclick=loadReports;$("#printReport").onclick=()=>window.print();
 $("#mobileMenu").onclick=()=>$("#sidebar").classList.toggle("open");
 $$(".nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.page)));
