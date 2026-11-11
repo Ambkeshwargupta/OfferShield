@@ -154,11 +154,11 @@
           <div class="field"><label for="offerRecruiterEmail">Recruiter email (optional)</label><input id="offerRecruiterEmail" placeholder="hr@company.in"></div>
         </div>
         <div class="field"><label for="offerSourceUrl">Where did you find this internship? (optional)</label><input id="offerSourceUrl" placeholder="Job portal, LinkedIn post, WhatsApp group or application link"></div>
-        <div class="field"><label for="offerText">Paste the message, chat or offer details</label><textarea id="offerText" placeholder="Paste the WhatsApp/Telegram/LinkedIn conversation, email, internship description or offer text. Include stipend, duration, joining date, work mode, payment requests and interview stages if stated. Remove personal information first."></textarea><small>Up to 30,000 characters. You can combine pasted text with screenshots and documents below.</small></div>
+        <div class="field"><label for="offerText">Paste the message, chat or offer details</label><textarea id="offerText" placeholder="Paste the WhatsApp/Telegram/LinkedIn conversation, email, internship description or offer text. Include stipend, duration, joining date, work mode, payment requests and interview stages if stated. Remove personal information first."></textarea><small>Up to 30,000 characters. You can combine pasted text with screenshots and documents below. Use clear, uncropped images; small or blurry text may not be extracted correctly.</small></div>
         <div class="field">
           <label for="offerFiles">Upload chat screenshots, offer letters or internship documents</label>
-          <input id="offerFiles" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,.html,.htm,.xml,.odt">
-          <small>Supports PDF, DOCX, ODT, HTML, XML and screenshot images (PNG/JPG/WEBP). Up to 5 files and 12 MB combined.</small>
+          <input id="offerFiles" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.svg,.gif,.bmp,.docx,.xlsx,.xlsm,.xlsb,.xls,.ods,.csv,.numbers,.html,.htm,.xml,.odt">
+          <small>Supports PDF, DOCX, XLSX/XLS/ODS, CSV, ODT, HTML/XML and screenshots/images (PNG/JPG/WEBP/GIF/BMP/SVG). Up to 5 files and 12 MB combined. Paste TXT/EML content into the message box.</small>
           <div id="offerFileList" class="file-list"><span class="small muted">No files selected. Screenshots of chats and offer letters can be added here.</span></div>
         </div>
         <div class="form-actions"><button class="btn primary" id="analyseBtn">Analyse company & evidence →</button><button class="btn" id="sampleBtn">Load synthetic demo example</button><button class="btn ghost" id="clearBtn">Clear</button></div>
