@@ -140,3 +140,63 @@ test("Udyam page search only filters records already returned for that State/Dis
     assert.equal(body.records[0].enterpriseName,"BETA INDUSTRIES");
   }finally{globalThis.fetch=originalFetch}
 });
+
+
+test("company search uses the imported national D1 index for exact CIN matches",async()=>{
+  const sample={
+    cin:"U12345MH2020PTC123456",
+    name:"EXAMPLE TECHNOLOGIES PRIVATE LIMITED",
+    status:"Active",company_class:"Private",category:"Company limited by Shares",
+    sub_category:"Non-government company",registration_date:"2020-04-01",
+    state:"Maharashtra",roc:"RoC Mumbai",authorized_capital:"1000000",
+    paid_up_capital:"100000",registered_office:"Mumbai, Maharashtra",
+    listing_status:"Unlisted",industrial_classification:"62099",
+    source_updated_at:"2026-10-13"
+  };
+  const db={
+    prepare(sql){
+      return {sql,bind(...values){
+        return {
+          run:async()=>({success:true}),
+          first:async()=>({count:1}),
+          all:async()=>({results:[sample]})
+        };
+      }};
+    }
+  };
+  const response=await worker.fetch(
+    new Request("https://api.example.workers.dev/v1/search?q=U12345MH2020PTC123456"),
+    env({DB:db}),ctx
+  );
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.nationalIndex.available,true);
+  assert.equal(body.nationalIndex.strategy,"exact_registration_identifier");
+  assert.equal(body.nationalIndex.indexedMatches,1);
+  assert.equal(body.registry[0].identifier,sample.cin);
+  assert.equal(body.registry[0].name,sample.name);
+  assert.equal(body.registry[0].evidenceStatus,"official_dataset_record");
+});
+
+test("national company index reports not-ready state without breaking fallback search",async()=>{
+  const db={
+    prepare(sql){
+      return {sql,bind(){
+        return {
+          run:async()=>({success:true}),
+          first:async()=>({count:1}),
+          all:async()=>{throw new Error("no such table: companies")}
+        };
+      }};
+    }
+  };
+  const response=await worker.fetch(
+    new Request("https://api.example.workers.dev/v1/search?q=U12345MH2020PTC123456"),
+    env({DB:db}),ctx
+  );
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.nationalIndex.available,false);
+  assert.equal(body.nationalIndex.strategy,"company_index_not_ready");
+  assert.match(body.nationalIndex.message,/Apply workers\/migrations/);
+});
