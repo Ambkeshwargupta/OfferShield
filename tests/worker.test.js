@@ -563,7 +563,8 @@ test("completed internship certificate is not scored as a failed new offer; MCA 
       tavilyQueries.push(query);
       let result;
       if(query.includes("site:linkedin.com/company")) result={title:"Afthonia Lab Pvt Ltd | LinkedIn",url:"https://www.linkedin.com/company/afthonia-lab/",content:"Public LinkedIn company page for the Bengaluru fintech incubator."};
-      else if(query.includes("founders history partnerships")) result={title:"Afthonia Lab company profile",url:"https://inc42.com/buzz/afthonia-lab-profile/",content:"Independent company-history and startup ecosystem coverage."};
+      else if(query.includes("founders leadership team history")) result={title:"Afthonia Lab company profile",url:"https://inc42.com/buzz/afthonia-lab-profile/",content:"Independent company-history and startup ecosystem coverage."};
+      else if(query.includes("ecosystem partners clients startups")) result={title:"Afthonia Lab ecosystem partners",url:"https://www.afthonialab.com/ecosystempartners",content:"Company-published partners and ecosystem network."};
       else if(query.includes("internship jobs hiring")) result={title:"Afthonia Lab internship opportunities",url:"https://internshala.com/company/afthonia-lab/",content:"Public hiring and internship listing reference."};
       else if(query.includes("official website")) result={title:"Afthonia Lab official website",url:"https://www.afthonialab.com/about",content:"Official website result referencing company programmes and team."};
       else result={title:"Public profile reference",url:"https://www.linkedin.com/in/afthonia-operations/",content:"Public professional profile search reference."};
@@ -594,7 +595,9 @@ test("completed internship certificate is not scored as a failed new offer; MCA 
   assert.equal(body.digitalFootprint.configured,true);
   assert.equal(body.digitalFootprint.signals.linkedinCompanyPagesFound,1);
   assert.ok(body.digitalFootprint.sources.some(x=>x.host==="inc42.com"));
-  assert.ok(tavilyQueries.length>=4);
+  assert.ok(body.digitalFootprint.sources.some(x=>x.categories.includes("ecosystem_network")));
+  assert.equal(body.digitalFootprint.signals.ecosystemNetworkResults,1);
+  assert.ok(tavilyQueries.length>=5);
   assert.match(modelInput,/digitalFootprint/);
   assert.doesNotMatch(body.redFlags.join(" "),/No MCA|generic email|No stipend|No official contact/i);
 });
