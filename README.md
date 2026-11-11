@@ -10,7 +10,7 @@ OfferShield is an India-first company and recruitment due-diligence platform foc
 
 - **GitHub Pages:** static premium website in `docs/`.
 - **Cloudflare Workers:** optional server-side intelligence API in `workers/api.js`.
-- **Cloudflare D1:** cache, source registry, company observations, public contact evidence and hashed-IP rate limits in `workers/schema.sql`.
+- **Cloudflare D1:** cache, source registry, company observations, public contact evidence, hashed-IP rate limits and moderated community recruitment contributions in workers/schema.sql.
 - **Node API:** standalone single-origin prototype in `server.js`.
 - **Tests:** Node built-in tests for the Node server, Worker API and browser page.
 
@@ -25,6 +25,8 @@ OfferShield is an India-first company and recruitment due-diligence platform foc
 - Use the connected Worker and Workers AI to extract evidence and analyse offer terms, payment requests, recruitment stages, missing details and consistency/risk signals.
 - Display stages mentioned in the student's evidence separately from generic possible stages; never present them as company-confirmed.
 - Save the analysis summary locally in the current browser. Original uploaded file bytes are not included in the saved report.
+- Contribute anonymised, structured first-person recruitment experience to Community Recruitment Intelligence. Reports remain private until moderation, and public/AI patterns require at least three approved reports in the last 12 months.
+- Review aggregated community recruitment stages, stipend bands, durations, work modes and outcomes. Approved aggregates can be retrieved as context during a company investigation; this is not model fine-tuning.
 
 ### Advanced intelligence UI
 - Search by company name, CIN, LLPIN, GSTIN or domain.
@@ -46,6 +48,7 @@ OfferShield is an India-first company and recruitment due-diligence platform foc
 - DNS-over-HTTPS and RDAP lookups.
 - Email header parser.
 - AI-assisted internship/offer investigation endpoint (POST /v1/investigate) using Workers AI Markdown Conversion and Llama 3.3 70B JSON-mode inference.
+- Community Recruitment Intelligence API: opt-in structured submissions, pending moderation, deletion tokens, aggregate-only public insights, a three-report privacy threshold and retrieval of approved patterns as AI context. Requires D1 plus migration 0003_community_intelligence.sql.
 - Screenshot/document evidence extraction, domain DNS/RDAP and pasted email-header clues, MCA indexed-name/CIN lookup, regional Udyam enterprise discovery and Wikidata candidates, plus structured student-facing assessment and, when D1 is configured, company-published verification contact cross-checks.
 - D1-backed API response cache and rate limit buckets when D1 is configured.
 
