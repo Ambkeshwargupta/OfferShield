@@ -44,6 +44,7 @@ if (tokenCheck.result?.status !== "active") {
   throw new Error("Cloudflare token verification did not return active status. Check the GitHub CLOUDFLARE_API_TOKEN value and account scope.");
 }
 console.log("Cloudflare token verification: active for the configured account.");
+console.log("Cloudflare token ID (non-secret): " + (tokenCheck.result?.id || "not-returned"));
 
 const endpoint = "/accounts/" + accountId + "/d1/database";
 let database;
