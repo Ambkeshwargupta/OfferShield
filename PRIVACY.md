@@ -28,3 +28,16 @@ OfferShield is designed to reduce the personal information needed for a recruitm
 - Use browser clear/delete controls to remove local reports.
 
 This is product privacy documentation, not legal advice or a complete statutory privacy notice. Review applicable Indian data-protection duties, consent, retention, vendor terms and grievance processes before opening the service to broad public use.
+
+
+## Community Recruitment Intelligence
+
+The community experience form accepts structured fields only: company name/domain, opportunity and role categories, broad work location, work mode, stipend/duration bands, recruitment-stage checkboxes, whether a payment request was reported, and the contribution outcome. It does not accept candidate names, recruiter names, email addresses, phone numbers, screenshots, chat contents or free-text allegations.
+
+Contributions are stored in Cloudflare D1 with a moderation status of pending. They are not public and are not included in AI analysis until a moderator approves them. After approval, only aggregate counts are available, and only when at least three approved submissions for the matching company/domain exist within the last 12 months. Individual contributions are never returned by the public API. A network-derived hash is used for rate limiting; the raw connecting IP is not stored by the community feature.
+
+Each submitter receives a one-time deletion token. Only its SHA-256 hash is stored. The user must keep the token to delete their contribution; OfferShield cannot recover it. The app does not provide user accounts or a lost-token recovery process in this release.
+
+Approved aggregate community patterns are retrieved as context for the AI investigation. This is retrieval-based grounding, not fine-tuning or a change to the model's weights. These patterns are self-reported and moderator-reviewed, not employer-confirmed facts. The public result includes the sample count and time window and does not expose a report-level feed.
+
+Do not submit information about another person, personal identifiers, confidential employer documents or anything you are not authorised to share. The company name/domain identifies the subject of the experience and is retained for aggregation. Review and publish a community-specific retention/deletion policy and moderation contact before broad public launch.
