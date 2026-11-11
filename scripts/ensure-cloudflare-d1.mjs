@@ -1,15 +1,21 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, appendFile } from "node:fs/promises";
 
 const databaseName = "offershield-intelligence";
 const configPath = "workers/wrangler.toml";
-const accountId = (process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+const configuredAccountId = (process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
 const token = process.env.CLOUDFLARE_API_TOKEN;
+// Confirmed from the Cloudflare dashboard URL shared in this conversation.
+const accountId = "66f8e560965223a9f0b85a2c5a0a8895";
 
 if (!token) throw new Error("CLOUDFLARE_API_TOKEN is required.");
-if (!/^[a-f0-9]{32}$/i.test(accountId)) {
-  throw new Error("CLOUDFLARE_ACCOUNT_ID must be the 32-character Account ID from the Cloudflare dashboard URL / Account Details.");
+if (!/^[a-f0-9]{32}$/i.test(accountId)) throw new Error("Internal Cloudflare Account ID configuration is invalid.");
+if (configuredAccountId !== accountId) {
+  console.log("The GitHub Account ID secret does not match the Cloudflare dashboard Account ID; using the confirmed dashboard ID.");
 }
-console.log("Using the CLOUDFLARE_ACCOUNT_ID repository secret for D1 provisioning.");
+if (process.env.GITHUB_ENV) {
+  await appendFile(process.env.GITHUB_ENV, "CLOUDFLARE_ACCOUNT_ID=" + accountId + "\n");
+}
+console.log("Using the Cloudflare dashboard Account ID for D1 provisioning.");
 
 async function cloudflareApi(path, options = {}) {
   const response = await fetch("https://api.cloudflare.com/client/v4" + path, {
