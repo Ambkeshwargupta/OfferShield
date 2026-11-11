@@ -84,6 +84,54 @@ The Worker calls the Workers AI Markdown Conversion method (env.AI.toMarkdown) t
 
 **Enablement:** workers/wrangler.toml includes the Workers AI binding: [ai] binding = "AI". Redeploy the Worker after this binding is added. The health endpoint reports aiConfigured and documentConversionConfigured; the Advanced Search connection test shows whether AI is enabled. Workers AI model inference is metered. Markdown conversion is free for most file conversions, while some image conversion paths may invoke models and use AI allocation. Review current [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) and [Markdown Conversion](https://developers.cloudflare.com/workers-ai/features/markdown-conversion/) before broad public use.
 
+
+## Community Recruitment Intelligence (D1 required)
+
+The Community Recruitment Intelligence page is an opt-in experience-sharing system for students evaluating internships and fresher jobs. It stores only structured fields: company name/domain, opportunity type, role category, state, work mode, stipend band, duration band, stage checkboxes, payment-request response and application outcome. It does not accept free text, screenshots, offer documents, candidate/recruiter names, emails or phone numbers.
+
+### Enable the D1 table
+
+1. Create the D1 database named offershield-intelligence in Cloudflare.
+2. In workers/wrangler.toml, uncomment the D1 binding block, keep binding = "DB" and database_name = "offershield-intelligence", and replace the placeholder with the actual D1 database ID.
+3. For a new database, apply the full schema: wrangler d1 execute offershield-intelligence --remote --file=workers/schema.sql
+4. For an already-running database that has the existing base schema, apply only the new community migration: wrangler d1 execute offershield-intelligence --remote --file=workers/migrations/0003_community_intelligence.sql
+5. Redeploy the Worker. The /v1/health response should show d1Configured: true and communityIntelligenceConfigured: true.
+
+### API and safeguards
+
+- POST /v1/community/reports accepts JSON structured fields with explicit own-experience and consent flags. It stores the submission as pending.
+- GET /v1/community/insights?companyName=...&website=... returns aggregated patterns only after at least three approved reports for the matching company key/domain during the previous 365 days.
+- DELETE /v1/community/reports/{reportId} deletes a contribution when the one-time 48-character deletion token is supplied. Only the SHA-256 token hash is stored; users must keep the token.
+- The community submission endpoint is rate-limited to three reports/hour per hashed network identity, in addition to the regular API limit.
+- Individual reports are never returned by a public endpoint. Pending and rejected records are not used by AI.
+- The AI receives only approved aggregates (report count, stage frequency, stipend/duration/work-mode bands and outcomes), labelled as self-reported and moderator-reviewed. A single reported payment request is not proof of misconduct.
+- This is retrieval-based context (often called RAG), not model fine-tuning. Workers AI inference uses a hosted model; this feature does not update the model's weights.
+
+### Manual moderation
+
+Submissions are private and pending until a moderator reviews them. In Cloudflare Dashboard → D1 → offershield-intelligence → Console, review pending rows:
+
+SELECT id, company_name, company_domain, opportunity_type, role_category,
+       state, work_mode, stipend_band, duration_band, payment_request,
+       outcome, recruitment_stages_json, created_at
+FROM community_reports
+WHERE moderation_status = 'pending'
+ORDER BY created_at ASC;
+
+Approve only structured reports that appear complete, plausible and policy-compliant:
+
+UPDATE community_reports
+SET moderation_status = 'approved', approved_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+WHERE id = 'REPORT_UUID' AND moderation_status = 'pending';
+
+Reject spam, duplicates, personal data, attempts to identify individuals, or submissions that are not a first-person experience:
+
+UPDATE community_reports
+SET moderation_status = 'rejected', moderation_note = 'Reason for moderation decision'
+WHERE id = 'REPORT_UUID' AND moderation_status = 'pending';
+
+Never publish individual submissions. The query/API exposes aggregate counts only, after the three-report threshold. Keep moderation decisions and any grievance process consistent with your published privacy policy.
+
 ## Operational and security notes
 
 - D1 caches OGD responses for 24 hours and records returned claim-level observations with source ID, retrieval time and expiry.
