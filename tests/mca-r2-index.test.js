@@ -42,7 +42,11 @@ test("MCA R2 index builder creates compact token-partitioned gzip postings",asyn
     assert.ok(manifest.shardCount>=4);
     const shards=(await filesRecursive(output)).filter(file=>file.endsWith(".ndjson.gz"));
     assert.equal(shards.length,manifest.shardCount);
-    const records=shards.flatMap(file=>gunzipSync(await readFile(file)).toString("utf8").trim().split(/\r?\n/).map(line=>JSON.parse(line)));
+    const records=[];
+    for(const file of shards) {
+      const text=gunzipSync(await readFile(file)).toString("utf8").trim();
+      if(text) records.push(...text.split(/\r?\n/).map(line=>JSON.parse(line)));
+    }
     assert.ok(records.some(row=>row.i===rows[0].cin && row.n===rows[0].name));
     assert.ok(records.some(row=>row.i===rows[1].cin && row.n===rows[1].name));
   } finally {
