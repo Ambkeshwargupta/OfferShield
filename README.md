@@ -34,7 +34,8 @@ OfferShield is an India-first company and recruitment due-diligence platform. Ca
 - Save combined investigation notes in local browser storage.
 
 ### Cloudflare backend
-- MCA company master-data lookup through the official data.gov.in resource (free registered API key required).
+- MCA company master-data lookup through the current official data.gov.in portal API route (free registered API key required).
+- Resumable national MCA bulk-data importer and R2 token-search index builder; full import is launched from GitHub Actions after R2 credentials are configured.
 - Resumable bulk MCA company/LLP master-data downloader and D1 FTS5 national search-index importer (requires local key and configured D1; no national snapshot is bundled in Git).
 - Exact CIN/LLPIN and CompanyName filters.
 - Wikidata discovery candidates.
