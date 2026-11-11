@@ -661,7 +661,14 @@ async function analyseInternshipUpload(request, env, origin) {
 
   const allowed = {
     pdf:"application/pdf",png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",webp:"image/webp",
+    svg:"image/svg+xml",gif:"image/gif",bmp:"image/bmp",
     docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    xlsm:"application/vnd.ms-excel.sheet.macroenabled.12",
+    xlsb:"application/vnd.ms-excel.sheet.binary.macroenabled.12",
+    xls:"application/vnd.ms-excel",
+    ods:"application/vnd.oasis.opendocument.spreadsheet",
+    csv:"text/csv",numbers:"application/vnd.apple.numbers",
     html:"text/html",htm:"text/html",xml:"application/xml",odt:"application/vnd.oasis.opendocument.text"
   };
   const documents = [];
@@ -670,7 +677,7 @@ async function analyseInternshipUpload(request, env, origin) {
     const name = String(file.name || "evidence").split(/[\\/]/).pop().replace(/[^\w .()-]/g,"_").slice(0,120);
     const ext = name.includes(".") ? name.split(".").pop().toLowerCase() : "";
     const mime = allowed[ext];
-    if (!mime) return jsonError("Use PDF, PNG, JPG, WEBP, DOCX, HTML, XML or ODT files. Paste TXT and EML content into the message box.",415,origin,"unsupported_file_type");
+    if (!mime) return jsonError("Unsupported file. Use PDF, images, DOCX, XLSX/XLS/ODS, CSV, NUMBERS, HTML, XML or ODT. Paste TXT and EML content into the message box.",415,origin,"unsupported_file_type");
     documents.push({name,blob:new Blob([await file.arrayBuffer()],{type:mime})});
     fileInfo.push({name,type:mime,bytes:file.size});
   }
