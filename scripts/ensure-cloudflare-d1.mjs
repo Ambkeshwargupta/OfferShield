@@ -79,13 +79,15 @@ try {
 if (!database?.uuid) throw new Error("Cloudflare did not return the D1 database UUID.");
 
 let config = await readFile(configPath, "utf8");
-const hasDbBlock = config.includes("[[d1_databases]]") && config.includes('binding = "DB"');
-if (!hasDbBlock) {
-  const commentStart = config.indexOf("# Create a D1 database");
-  const commentEnd = config.indexOf("# Store DATA_GOV_API_KEY", commentStart);
-  if (commentStart >= 0 && commentEnd > commentStart) {
-    config = config.slice(0, commentStart) + config.slice(commentEnd);
-  }
+const lines = config.split(/\\r?\\n/);
+const activeStart = lines.findIndex(line => /^\\s*\\[\\[d1_databases\\]\\]\\s*$/.test(line));
+
+if (activeStart < 0) {
+  // Remove the commented setup example only; do not mistake it for an active TOML table.
+  config = config.replace(
+    /^# Create a D1 database, then replace the placeholder database_id and uncomment:\\r?\\n# \\[\\[d1_databases\\]\\]\\r?\\n# binding = "DB"\\r?\\n# database_name = "offershield-intelligence"\\r?\\n# database_id = "REPLACE_WITH_D1_DATABASE_ID"\\r?\\n?/m,
+    ""
+  );
   config = config.trimEnd() + [
     "",
     "[[d1_databases]]",
@@ -93,16 +95,18 @@ if (!hasDbBlock) {
     'database_name = "' + databaseName + '"',
     'database_id = "' + database.uuid + '"',
     ""
-  ].join("\n");
+  ].join("\\n");
 } else {
-  const blockStart = config.indexOf("[[d1_databases]]");
-  const blockEnd = config.indexOf("\n[[", blockStart + 1);
-  const existingBlock = config.slice(blockStart, blockEnd >= 0 ? blockEnd : undefined);
-  if (!existingBlock.includes('database_name = "' + databaseName + '"') ||
-      !existingBlock.includes('database_id = "' + database.uuid + '"')) {
-    throw new Error("workers/wrangler.toml has a D1 DB binding, but it does not match the Cloudflare database found. Review it before redeploying.");
+  const nextTable = lines.findIndex((line, index) => index > activeStart && /^\\s*\\[\\[/.test(line));
+  const blockLines = lines.slice(activeStart, nextTable < 0 ? lines.length : nextTable);
+  const hasDbBinding = blockLines.some(line => /^\\s*binding\\s*=\\s*"DB"\\s*$/.test(line));
+  if (!hasDbBinding) throw new Error("An active D1 table exists in workers/wrangler.toml but does not bind env.DB.");
+  const blockText = blockLines.join("\\n");
+  const nameMatch = blockText.match(/^\\s*database_name\\s*=\\s*"([^"]+)"/m);
+  const idMatch = blockText.match(/^\\s*database_id\\s*=\\s*"([^"]+)"/m);
+  if (nameMatch?.[1] !== databaseName || idMatch?.[1] !== database.uuid) {
+    throw new Error("An active D1 DB binding exists but points to a different database. Review workers/wrangler.toml before replacing it.");
   }
 }
-
 await writeFile(configPath, config, "utf8");
 console.log("D1 is ready: " + databaseName + ". The database UUID is stored in workers/wrangler.toml; it is not a secret.");
