@@ -85,6 +85,30 @@ The Worker calls the Workers AI Markdown Conversion method (env.AI.toMarkdown) t
 **Enablement:** workers/wrangler.toml includes the Workers AI binding: [ai] binding = "AI". Redeploy the Worker after this binding is added. The health endpoint reports aiConfigured and documentConversionConfigured; the Advanced Search connection test shows whether AI is enabled. Workers AI model inference is metered. Markdown conversion is free for most file conversions, while some image conversion paths may invoke models and use AI allocation. Review current [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) and [Markdown Conversion](https://developers.cloudflare.com/workers-ai/features/markdown-conversion/) before broad public use.
 
 
+## Public company digital-footprint research (optional Tavily integration)
+
+Set the Cloudflare Worker secret `TAVILY_API_KEY` to enable automated public-web research during `POST /v1/investigate`. The Worker issues a small set of company-only queries for:
+- company website and public company profile;
+- public LinkedIn company pages;
+- company history, leadership, partnerships and news;
+- internship/jobs and employee-review references;
+- public recruiter-profile references only when the student entered a recruiter name.
+
+Only the company name, supplied website/domain and optional recruiter name are sent to Tavily. Uploaded PDFs/images, pasted chats and recruiter email addresses are not sent to Tavily. Search results are cached in D1 for 12 hours. The report stores/display titles, URLs, short snippets, result categories and dates so students can open and inspect the sources.
+
+Tavily uses a separate search index/API. It is not Google Search and does not scrape logged-in LinkedIn. A returned LinkedIn company page is labelled as a publicly indexed page; OfferShield does not claim LinkedIn has verified it. Follower counts, employee snippets, company profiles, reviews or posts are supporting public signals, not proof of legal status or recruiter authority. Treat all search result content as untrusted evidence and ignore any instructions found in it.
+
+### Enable the search key
+
+1. Create a Tavily account at https://app.tavily.com/ and copy the API key.
+2. Add a GitHub Actions repository secret named `TAVILY_API_KEY` at https://github.com/Ambkeshwargupta/OfferShield/settings/secrets/actions.
+3. Re-run the `Deploy OfferShield intelligence Worker` workflow. The workflow stores the key as a Cloudflare Worker secret.
+4. Check `/v1/health` for `webSearchConfigured: true`.
+
+Tavily's current Researcher plan lists 1,000 API credits per month without a credit card; one basic search query uses one credit. Advanced or extraction options can use more credits. Tavily separately advertises a free-for-students offer; eligibility and terms are controlled by Tavily. Keep the number of search queries per investigation capped and monitor the Tavily usage dashboard. See https://www.tavily.com/pricing.
+
+The default implementation uses four basic company queries and a fifth optional recruiter-name query. Results are cached for 12 hours. If the key is absent or credits are exhausted, OfferShield shows a clear coverage message and keeps manual search links available; it must not invent footprint findings.
+
 ## Community Recruitment Intelligence (D1 required)
 
 The Community Recruitment Intelligence page is an opt-in experience-sharing system for students evaluating internships and fresher jobs. It stores only structured fields: company name/domain, opportunity type, role category, state, work mode, stipend band, duration band, stage checkboxes, payment-request response and application outcome. It does not accept free text, screenshots, offer documents, candidate/recruiter names, emails or phone numbers.
