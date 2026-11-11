@@ -79,13 +79,13 @@ try {
 if (!database?.uuid) throw new Error("Cloudflare did not return the D1 database UUID.");
 
 let config = await readFile(configPath, "utf8");
-const lines = config.split(/\\r?\\n/);
-const activeStart = lines.findIndex(line => /^\\s*\\[\\[d1_databases\\]\\]\\s*$/.test(line));
+const lines = config.split(/\r?\n/);
+const activeStart = lines.findIndex(line => /^\s*\[\[d1_databases\]\]\s*$/.test(line));
 
 if (activeStart < 0) {
   // Remove the commented setup example only; do not mistake it for an active TOML table.
   config = config.replace(
-    /^# Create a D1 database, then replace the placeholder database_id and uncomment:\\r?\\n# \\[\\[d1_databases\\]\\]\\r?\\n# binding = "DB"\\r?\\n# database_name = "offershield-intelligence"\\r?\\n# database_id = "REPLACE_WITH_D1_DATABASE_ID"\\r?\\n?/m,
+    /^# Create a D1 database, then replace the placeholder database_id and uncomment:\r?\n# \[\[d1_databases\]\]\r?\n# binding = "DB"\r?\n# database_name = "offershield-intelligence"\r?\n# database_id = "REPLACE_WITH_D1_DATABASE_ID"\r?\n?/m,
     ""
   );
   config = config.trimEnd() + [
@@ -95,15 +95,15 @@ if (activeStart < 0) {
     'database_name = "' + databaseName + '"',
     'database_id = "' + database.uuid + '"',
     ""
-  ].join("\\n");
+  ].join("\n");
 } else {
-  const nextTable = lines.findIndex((line, index) => index > activeStart && /^\\s*\\[\\[/.test(line));
+  const nextTable = lines.findIndex((line, index) => index > activeStart && /^\s*\[\[/.test(line));
   const blockLines = lines.slice(activeStart, nextTable < 0 ? lines.length : nextTable);
-  const hasDbBinding = blockLines.some(line => /^\\s*binding\\s*=\\s*"DB"\\s*$/.test(line));
+  const hasDbBinding = blockLines.some(line => /^\s*binding\s*=\s*"DB"\s*$/.test(line));
   if (!hasDbBinding) throw new Error("An active D1 table exists in workers/wrangler.toml but does not bind env.DB.");
-  const blockText = blockLines.join("\\n");
-  const nameMatch = blockText.match(/^\\s*database_name\\s*=\\s*"([^"]+)"/m);
-  const idMatch = blockText.match(/^\\s*database_id\\s*=\\s*"([^"]+)"/m);
+  const blockText = blockLines.join("\n");
+  const nameMatch = blockText.match(/^\s*database_name\s*=\s*"([^"]+)"/m);
+  const idMatch = blockText.match(/^\s*database_id\s*=\s*"([^"]+)"/m);
   if (nameMatch?.[1] !== databaseName || idMatch?.[1] !== database.uuid) {
     throw new Error("An active D1 DB binding exists but points to a different database. Review workers/wrangler.toml before replacing it.");
   }
