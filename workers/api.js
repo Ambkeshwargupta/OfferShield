@@ -882,7 +882,8 @@ async function searchCompanyDigitalFootprint(env, companyName, website, recruite
   const queries = [
     {category:"company_website",label:"Company website and profile",query:'"'+subject+'" '+(domain||"")+" official website company India",topic:"general"},
     {category:"linkedin_company",label:"Public LinkedIn company page",query:'site:linkedin.com/company "'+subject+'"',topic:"general"},
-    {category:"company_history",label:"Company history, leadership, partnerships and news",query:'"'+subject+'" India founders history partnerships clients events',topic:"news"},
+    {category:"company_history",label:"Company history, leadership and news",query:'"'+subject+'" India founders leadership team history company news',topic:"news"},
+    {category:"ecosystem_network",label:"Partners, clients, incubated startups and ecosystem network",query:'"'+subject+'" ecosystem partners clients startups incubated mentors investors corporate partners India',topic:"general"},
     {category:"jobs_reviews",label:"Hiring, internships and employee experiences",query:'"'+subject+'" internship jobs hiring employee reviews interns India',topic:"general"}
   ];
   if (recruiterName) queries.push({category:"recruiter_public_profile",label:"Public recruiter profile references",query:'"'+cleanText(recruiterName,100)+'" "'+subject+'" professional profile',topic:"general"});
@@ -903,6 +904,7 @@ async function searchCompanyDigitalFootprint(env, companyName, website, recruite
   const linkedinCompany = sources.filter(x=>x.host==="linkedin.com"||x.host.endsWith(".linkedin.com")).filter(x=>x.url.toLowerCase().includes("/company/"));
   const companySite = sources.filter(x=>domain && (x.host===domain||x.host.endsWith("."+domain)));
   const history = sources.filter(x=>x.categories.includes("company_history"));
+  const ecosystemNetwork = sources.filter(x=>x.categories.includes("ecosystem_network"));
   const jobsReviews = sources.filter(x=>x.categories.includes("jobs_reviews"));
   const recruiterProfiles = sources.filter(x=>x.categories.includes("recruiter_public_profile"));
   const independentHosts = new Set(sources.filter(x=>!domain||!(x.host===domain||x.host.endsWith("."+domain))).map(x=>x.host).filter(Boolean));
@@ -917,6 +919,7 @@ async function searchCompanyDigitalFootprint(env, companyName, website, recruite
       suppliedWebsiteReferenced:companySite.length>0,
       linkedinCompanyPagesFound:linkedinCompany.length,
       companyHistoryOrNewsResults:history.length,
+      ecosystemNetworkResults:ecosystemNetwork.length,
       jobsOrEmployeeExperienceResults:jobsReviews.length,
       recruiterProfileReferences:recruiterProfiles.length,
       distinctExternalHosts:independentHosts.size
