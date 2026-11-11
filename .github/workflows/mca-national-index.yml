@@ -34,10 +34,11 @@ jobs:
       AWS_DEFAULT_REGION: auto
       R2_BUCKET_NAME: offershield-company-index
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
+          package-manager-cache: false
 
       - name: Validate credentials and dedicated R2 bucket
         shell: bash
@@ -187,7 +188,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install --global wrangler
+          npm install --global wrangler@latest
           printf '%s' "$DATA_GOV_API_KEY" | wrangler secret put DATA_GOV_API_KEY --config workers/wrangler.toml
           wrangler deploy --config workers/wrangler.toml
 
