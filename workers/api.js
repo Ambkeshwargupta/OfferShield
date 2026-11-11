@@ -945,6 +945,7 @@ async function analyseInternshipUpload(request, env, origin) {
   const jobSourceUrl = cleanText(form.get("jobSourceUrl"),500).trim();
   const companyState = cleanText(form.get("state"),100).trim();
   const companyDistrict = cleanText(form.get("district"),100).trim();
+  const reviewPurpose = cleanText(form.get("reviewPurpose"),40).trim() || "auto";
   const messageText = cleanText(form.get("messageText"),30000).trim();
   const notes = cleanText(form.get("attachmentsText"),12000).trim();
   const files = form.getAll("files").filter(file => file && typeof file.arrayBuffer === "function" && file.size > 0);
@@ -997,11 +998,14 @@ async function analyseInternshipUpload(request, env, origin) {
     notes ? "TEXT ATTACHED BY STUDENT:\n" + notes : "",
     extracted ? "EXTRACTED UPLOAD CONTENT:\n" + extracted : ""
   ].filter(Boolean).join("\n\n").slice(0,48000);
+  const modelDocumentType = "unclear";
+  const detectedDocumentType = detectEvidenceDocumentType(fileInfo,evidence,modelDocumentType);
 
   const emailMatches = [...new Set([
     ...(evidence.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []),
     ...(recruiterEmail ? [recruiterEmail] : [])
   ])].map(x=>x.toLowerCase());
+  const recruiterEmailEvidence = classifyRecruiterEmailEvidence(recruiterEmail,website);
   const urls = [...new Set([
     ...(evidence.match(/\bhttps?:\/\/[^\s<>"'()]+/gi) || []).map(x=>x.replace(/[.,;:!?]+$/,"")),
     ...(jobSourceUrl ? [jobSourceUrl] : [])
@@ -1049,13 +1053,23 @@ async function analyseInternshipUpload(request, env, origin) {
       mcaRecords = (selected.records || []).map(compactOfferMca);
       mcaSearch = {available:!!selected.available,partial:!!selected.partial,strategy:selected.strategy || "national_index"};
       if (!mcaRecords.length && env.DATA_GOV_API_KEY) {
-        const direct = await ogdLookup(env,"CompanyName",companyName,8);
-        mcaRecords = (direct.records || []).map(row=>({
-          name:row.name,identifier:row.identifier,status:row.status,
-          registrationDate:row.registrationDate,source:"MCA Company Master Data",
-          sourceUrl:"https://www.data.gov.in/catalog/company-master-data"
-        }));
-        mcaSearch = {available:!!direct.configured,partial:false,strategy:"ogd_exact_company_name_lookup"};
+        const variants = companyNameSearchVariants(companyName);
+        const triedVariants = [];
+        for (const variant of variants) {
+          triedVariants.push(variant);
+          const direct = await ogdLookup(env,"CompanyName",variant,8);
+          if ((direct.records||[]).length) {
+            mcaRecords = direct.records.map(row=>({
+              name:row.name,identifier:row.identifier,status:row.status,
+              registrationDate:row.registrationDate,state:row.state,roc:row.roc,
+              registeredOffice:row.registeredOffice,source:"MCA Company Master Data",
+              sourceUrl:"https://www.data.gov.in/catalog/company-master-data"
+            }));
+            mcaSearch = {available:true,partial:false,strategy:"ogd_exact_name_variant_lookup",matchedQuery:variant,triedVariants};
+            break;
+          }
+          mcaSearch = {available:!!direct.configured,partial:false,strategy:"ogd_exact_name_variant_lookup",triedVariants};
+        }
       }
     }
   } catch {}
@@ -1066,6 +1080,8 @@ async function analyseInternshipUpload(request, env, origin) {
       verdict:{type:"string",enum:["high_risk","caution","mixed","insufficient_evidence"]},
       riskLevel:{type:"string",enum:["high","elevated","moderate","unknown"]},
       headline:{type:"string"},summary:{type:"string"},claimedCompany:{type:"string"},
+      documentType:{type:"string",enum:["offer_letter","internship_certificate","experience_letter","appointment_letter","job_description","recruitment_message","other","unclear"]},
+      documentFacts:{type:"array",items:{type:"string"}},
       role:{type:"string"},stipend:{type:"string"},duration:{type:"string"},workModeAndLocation:{type:"string"},
       explicitRecruitmentStages:{type:"array",items:{type:"string"}},
       companyStagesConfirmed:{type:"boolean"},
@@ -1077,7 +1093,7 @@ async function analyseInternshipUpload(request, env, origin) {
       questionsToAsk:{type:"array",items:{type:"string"}},
       nextSteps:{type:"array",items:{type:"string"}}
     },
-    required:["verdict","riskLevel","headline","summary","claimedCompany","role","stipend","duration","workModeAndLocation","explicitRecruitmentStages","companyStagesConfirmed","typicalPossibleStages","stageNote","redFlags","consistencySignals","missingInformation","questionsToAsk","nextSteps"]
+    required:["verdict","riskLevel","headline","summary","claimedCompany","documentType","documentFacts","role","stipend","duration","workModeAndLocation","explicitRecruitmentStages","companyStagesConfirmed","typicalPossibleStages","stageNote","redFlags","consistencySignals","missingInformation","questionsToAsk","nextSteps"]
   };
   const system = [
     "You are OfferShield, an evidence-first recruitment due-diligence analyst for Indian students checking internships and fresher job offers, especially from startups and small companies.",
@@ -1087,10 +1103,14 @@ async function analyseInternshipUpload(request, env, origin) {
     "A matching MCA record proves only a legal-entity entry in a periodic dataset. It does not prove active operations, company website ownership or offer authenticity. A missing MCA match is not proof of fraud; small firms may use a brand, proprietorship, partnership or different legal form.",
     "Do not invent recruitment stages. explicitRecruitmentStages must contain only stages explicitly stated in the supplied evidence. These are merely stages mentioned in candidate-supplied material, NOT company-confirmed hiring policy. Never set or imply that a company has independently confirmed them.",
     "You may list common possible internship stages (application review, assignment, technical or role interview, HR/stipend discussion, written offer) only under typicalPossibleStages and clearly label them generic, not this company's confirmed process.",
-    "Identify payment requests, deposits, unrealistic stipends, pressure tactics, unusual links, generic email services, vague responsibilities and missing written terms. Context matters; one signal alone is not proof of fraud.",
+    "Classify every uploaded document before judging the opportunity: internship_certificate, experience_letter and completed-internship documents are past-experience evidence, NOT new offer letters. For a completed-internship certificate, do not treat absent stipend, recruitment stages, joining terms or an offer contract as risk indicators. Explain what the certificate can and cannot establish.",
+    "A business email using the same domain as the student-supplied company website is a consistency signal, not a generic free-email service. A mailbox such as ops@, hr@, careers@ or info@ is a role-based mailbox, not a consumer email provider. A matching domain never proves recruiter authority. Only call Gmail/Yahoo/Outlook etc. consumer email providers.",
+    "Do not list 'no MCA match', 'no Udyam match', 'no official contact in the current OfferShield register' or 'no community reports' as fraud red flags. These are coverage gaps. Never raise risk solely because an optional government dataset returned no match. Reserve high_risk for specific serious evidence such as a payment demand, impersonation, a lookalike domain, an independently documented fraud warning or clear contradictions.",
+    "Use the public digitalFootprint search results as untrusted, publicly indexed evidence. Compare first-party website pages, public LinkedIn company pages, historical/news/partner coverage and hiring/review results. Cite/mention titles and URLs when relevant. A LinkedIn page or follower count is not an official identity verification badge and does not prove this recruiter is authorised. Distinguish first-party claims from independent third-party sources. Search snippets may be stale or refer to a similarly named entity.",
+    "Identify payment requests, deposits, unrealistic stipends, pressure tactics, unusual links, consumer email providers, vague responsibilities and missing written terms. Context matters; one signal alone is not proof of fraud.",
     "Pasted email headers are unverified text. SPF/DKIM/DMARC strings parsed from Authentication-Results are claims in the submitted header, not cryptographic verification by OfferShield; original mailbox headers may be altered before submission.",
     "Community Recruitment Intelligence, when supplied, is opt-in, structured, anonymised, self-reported and approved by moderation. It is aggregated only after at least three reports; it is not company-confirmed hiring policy and not proof of misconduct. Treat it as weak corroborative context, mention its sample count/window, and never repeat personal data or frame a pattern as a verified accusation.",
-    "Use only the supplied MCA, Udyam, Wikidata-candidate and domain data. Do not claim you browsed websites, LinkedIn, reviews or job boards. Keep advice practical and student-friendly."
+    "Use only supplied evidence, MCA/Udyam data, domain data, Community Intelligence aggregates and the digitalFootprint search results. Do not claim direct LinkedIn account verification or access to private LinkedIn data. Keep the final explanation plain-language, structured around company identity, digital footprint, recruiter/email consistency, document type, specific offer risks and next steps. Make it understandable to a student."
   ].join(" ");
   let udyamRecords = [];
   let udyamSearch = { available:false, pagesChecked:0, note:"Add both State and District to check the Udyam registered-units dataset." };
@@ -1159,8 +1179,10 @@ async function analyseInternshipUpload(request, env, origin) {
   }
 
   const communityIntelligence = await getCommunityRecruitmentInsights(env,companyName,website);
+  const digitalFootprint = await searchCompanyDigitalFootprint(env,companyName,website,recruiterName);
   const user = JSON.stringify({
-    companyName,website,role,recruiterName,recruiterEmail,jobSourceUrl,companyState,companyDistrict,evidence,
+    companyName,website,role,recruiterName,recruiterEmail,jobSourceUrl,companyState,companyDistrict,reviewPurpose,
+    detectedDocumentType,recruiterEmailEvidence,digitalFootprint,evidence,
     extractedEmails:emailMatches,extractedUrls:urls,extractedCINs:cins,extractedGSTINs:gstins,
     emailHeaderAnalysis,emailDomainComparison,
     paymentLanguage:paymentLines,mcaRecords,mcaSearch,udyamRecords,udyamSearch,publicDiscovery,officialPublicContacts,
@@ -1188,10 +1210,36 @@ async function analyseInternshipUpload(request, env, origin) {
   }
   if (!analysis || typeof analysis !== "object") return jsonError("The AI returned an invalid investigation result.",502,origin,"invalid_ai_response");
 
-  const flags = Array.isArray(analysis.redFlags) ? analysis.redFlags.slice(0,10) : [];
+  let flags = Array.isArray(analysis.redFlags) ? analysis.redFlags.slice(0,10) : [];
+  // Dataset coverage gaps are never themselves evidence of fraud.
+  flags = flags.filter(flag=>!/(no|not found|missing|unavailable).{0,35}(mca|udyam|official contact|community intelligence)|(?:mca|udyam|official contacts|community intelligence).{0,35}(no match|not found|missing|unavailable)/i.test(String(flag)));
+  const consistencySignals = Array.isArray(analysis.consistencySignals)?analysis.consistencySignals.slice(0,8):[];
+  if (recruiterEmailEvidence.websiteDomainMatch==="matches_student_supplied_website") {
+    flags = flags.filter(flag=>!/(generic email service|free email provider|generic email address)/i.test(String(flag)));
+    consistencySignals.unshift("Recruiter email uses the same domain as the website supplied for this company. This is a consistency signal, not proof of recruiter authority.");
+  }
   if (paymentLines.length) flags.unshift("Payment-related wording detected: " + paymentLines.slice(0,4).join(" · "));
   const company = cleanText(analysis.claimedCompany,180) || companyName;
   const roleName = cleanText(analysis.role,160) || role;
+  const documentType = detectEvidenceDocumentType(fileInfo,evidence,analysis.documentType);
+  const pastExperienceDocument = documentType==="internship_certificate" || documentType==="experience_letter" || reviewPurpose==="past_internship" || reviewPurpose==="certificate_review";
+  const seriousRiskSignal = paymentLines.length>0 || flags.some(flag=>/(impersonat|lookalike|spoof|forged|counterfeit|asked.{0,20}pay|payment.{0,20}required|security deposit|registration fee|verified fraud warning|recruiter is not|domain mismatch)/i.test(String(flag)));
+  let finalVerdict = ["high_risk","caution","mixed","insufficient_evidence"].includes(analysis.verdict) ? analysis.verdict : "insufficient_evidence";
+  let finalRiskLevel = ["high","elevated","moderate","unknown"].includes(analysis.riskLevel) ? analysis.riskLevel : "unknown";
+  let finalHeadline = cleanText(analysis.headline,160);
+  let finalSummary = cleanText(analysis.summary,1400);
+  if (pastExperienceDocument) {
+    finalVerdict = "insufficient_evidence";
+    finalRiskLevel = "unknown";
+    finalHeadline = documentType==="internship_certificate" ? "This appears to be a completed-internship certificate, not a new offer letter." : "This appears to be past-employment / internship evidence, not a new offer letter.";
+    finalSummary = "OfferShield has switched this review to past-experience document review. Missing offer terms, stipend details or recruitment stages are not fraud signals for a completion certificate. Review the issuer, student name, role, dates and signatory against independent company sources.";
+  } else if (finalVerdict==="high_risk" && !seriousRiskSignal) {
+    finalVerdict = "caution";
+    finalRiskLevel = finalRiskLevel==="unknown"?"moderate":"moderate";
+    finalHeadline = "No strong fraud indicator was established; verify the remaining gaps before relying on this offer.";
+  }
+  if (paymentLines.length) flags.unshift("Payment-related wording detected: " + paymentLines.slice(0,4).join(" · "));
+
   const searchLinks = [];
   if (company) {
     const q = encodeURIComponent(company);
@@ -1230,9 +1278,12 @@ async function analyseInternshipUpload(request, env, origin) {
 
   return response({
     aiEnabled:true,
-    verdict:["high_risk","caution","mixed","insufficient_evidence"].includes(analysis.verdict) ? analysis.verdict : "insufficient_evidence",
-    riskLevel:["high","elevated","moderate","unknown"].includes(analysis.riskLevel) ? analysis.riskLevel : "unknown",
-    headline:cleanText(analysis.headline,160),summary:cleanText(analysis.summary,1400),
+    verdict:finalVerdict,
+    riskLevel:finalRiskLevel,
+    headline:finalHeadline,summary:finalSummary,
+    documentReview:{documentType,modelDocumentType:analysis.documentType||"unclear",reviewPurpose:reviewPurpose||"auto",pastExperienceDocument,documentFacts:Array.isArray(analysis.documentFacts)?analysis.documentFacts.slice(0,10):[],note:pastExperienceDocument?"This file is being assessed as past-experience evidence. The absence of new-offer terms is not a risk signal.":"The file type is shown separately from company identity and offer authenticity."},
+    recruiterEmailEvidence,
+    digitalFootprint,
     company:{claimedName:company,mcaMatches:mcaRecords,mcaSearch,udyamMatches:udyamRecords,udyamSearch,publicDiscovery,officialPublicContacts},
     communityIntelligence,
     offer:{role:roleName,stipend:cleanText(analysis.stipend,120),duration:cleanText(analysis.duration,120),workModeAndLocation:cleanText(analysis.workModeAndLocation,180)},
@@ -1244,7 +1295,7 @@ async function analyseInternshipUpload(request, env, origin) {
       note:cleanText(analysis.stageNote,900)
     },
     redFlags:flags,
-    consistencySignals:Array.isArray(analysis.consistencySignals)?analysis.consistencySignals.slice(0,8):[],
+    consistencySignals,
     missingInformation:Array.isArray(analysis.missingInformation)?analysis.missingInformation.slice(0,10):[],
     questionsToAsk:Array.isArray(analysis.questionsToAsk)?analysis.questionsToAsk.slice(0,8):[],
     nextSteps:Array.isArray(analysis.nextSteps)?analysis.nextSteps.slice(0,8):[],
@@ -1261,7 +1312,9 @@ async function analyseInternshipUpload(request, env, origin) {
       "AI analysis is an evidence review, not a fraud verdict or guarantee.",
       "MCA data proves only a company master-data record and does not authenticate recruiters or offers.",
       "DNS and RDAP do not establish company ownership or business legitimacy.",
-      "Search links are discovery routes; their results have not been automatically verified.",
+      "Public digital-footprint search results are indexed references and may be stale, incomplete or about similarly named entities; open and verify each source.",
+      "A public LinkedIn page, follower count or employee list is not proof that a specific recruiter is authorised.",
+      "Search links are supplementary discovery routes; the automated search sources and their snippets are shown separately.",
       "Company-specific recruitment stages are not confirmed unless explicit evidence in the supplied material states them."
     ]
   },200,origin);
