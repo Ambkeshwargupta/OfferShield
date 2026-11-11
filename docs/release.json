@@ -1,0 +1,16 @@
+{
+  "product": "OfferShield",
+  "release": "udyam-regional-search",
+  "version": "1.1.0",
+  "updated": "2026-11-11",
+  "features": [
+    "MCA company master data connector",
+    "Udyam registered-unit search by mandatory State and District",
+    "Udyam enterprise-name/activity/pincode page filtering",
+    "DNS/RDAP and email-header investigation"
+  ],
+  "notes": [
+    "The Udyam dataset does not expose a Udyam Registration Number field.",
+    "Live official data.gov.in queries require DATA_GOV_API_KEY in the Cloudflare Worker secret store."
+  ]
+}
