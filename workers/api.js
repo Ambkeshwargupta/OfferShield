@@ -783,7 +783,8 @@ async function analyseInternshipUpload(request, env, origin) {
     "Do not invent recruitment stages. explicitRecruitmentStages must contain only stages explicitly stated in the supplied evidence. These are merely stages mentioned in candidate-supplied material, NOT company-confirmed hiring policy. Never set or imply that a company has independently confirmed them.",
     "You may list common possible internship stages (application review, assignment, technical or role interview, HR/stipend discussion, written offer) only under typicalPossibleStages and clearly label them generic, not this company's confirmed process.",
     "Identify payment requests, deposits, unrealistic stipends, pressure tactics, unusual links, generic email services, vague responsibilities and missing written terms. Context matters; one signal alone is not proof of fraud.",
-    "Use only the supplied MCA and domain data. Do not claim you browsed websites, LinkedIn, reviews or job boards. Keep advice practical and student-friendly."
+    "Pasted email headers are unverified text. SPF/DKIM/DMARC strings parsed from Authentication-Results are claims in the submitted header, not cryptographic verification by OfferShield; original mailbox headers may be altered before submission.",
+    "Use only the supplied MCA, Udyam, Wikidata-candidate and domain data. Do not claim you browsed websites, LinkedIn, reviews or job boards. Keep advice practical and student-friendly."
   ].join(" ");
   let udyamRecords = [];
   let udyamSearch = { available:false, pagesChecked:0, note:"Add both State and District to check the Udyam registered-units dataset." };
