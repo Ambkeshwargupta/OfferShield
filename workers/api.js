@@ -250,7 +250,7 @@ async function wikidataSearch(query) {
 }
 function companyIndexQuery(query) {
   const tokens = String(query || "").toLowerCase()
-    .normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "")
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
     .match(/[a-z0-9]+/g) || [];
   return [...new Set(tokens)].filter(token => token.length >= 2).slice(0, 6);
 }
