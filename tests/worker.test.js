@@ -391,3 +391,91 @@ test("AI internship review parses uploaded files and separates claimed stages fr
   assert.equal(body.uploadedEvidence.length,1);
   assert.equal(body.privacy.filesPersisted,false);
 });
+
+test("community intelligence requires D1 and never pretends a local fallback is shared",async()=>{
+  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/community/insights?companyName=Example%20Startup"),env(),ctx);
+  const body=await response.json();
+  assert.equal(response.status,503);
+  assert.equal(body.error.code,"community_database_not_configured");
+});
+
+test("community report requires explicit own-experience consent",async()=>{
+  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/community/reports",{
+    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({companyName:"Example Startup",consent:false,selfReport:true,consentVersion:"community-v1"})
+  }),env({DB:{prepare(){throw new Error("Should reject before writing")}}}),ctx);
+  const body=await response.json();
+  assert.equal(response.status,400);
+  assert.equal(body.error.code,"community_consent_required");
+});
+
+test("community reports store structured fields only and return one-time deletion credentials",async()=>{
+  const writes=[];
+  const db={prepare(sql){return {sql,bind(...values){return {
+    run:async()=>{if(sql.includes("INSERT INTO community_reports"))writes.push({sql,values});return {success:true,meta:{changes:1}}},
+    first:async()=>({count:1}),
+    all:async()=>({results:[]})
+  }}}}};
+  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/community/reports",{
+    method:"POST",headers:{"content-type":"application/json","CF-Connecting-IP":"192.0.2.10"},
+    body:JSON.stringify({
+      companyName:"Acme Technologies Pvt. Ltd.",website:"https://www.acme.example.in",
+      opportunityType:"internship",roleCategory:"software_it",state:"Madhya Pradesh",
+      workMode:"remote",stipendBand:"10000_20000",durationBand:"3_6_months",
+      stages:["assignment","technical_interview","technical_interview","unsupported_stage"],
+      paymentRequest:"no",outcome:"interviewed",consent:true,selfReport:true,consentVersion:"community-v1",
+      recruiterName:"Private Recruiter",recruiterEmail:"private@example.in",freeText:"Do not persist this"
+    })
+  }),env({DB:db}),ctx);
+  const body=await response.json();
+  assert.equal(response.status,201);
+  assert.equal(body.status,"pending_moderation");
+  assert.match(body.reportId,/^[a-f0-9-]{36}$/i);
+  assert.match(body.deletionToken,/^[a-f0-9]{48}$/);
+  assert.equal(writes.length,1);
+  assert.equal(writes[0].values[1],"Acme Technologies Pvt. Ltd.");
+  assert.equal(writes[0].values[2],"acme technologies");
+  assert.equal(writes[0].values[3],"acme.example.in");
+  assert.equal(writes[0].values.includes("Private Recruiter"),false);
+  assert.equal(writes[0].values.includes("private@example.in"),false);
+  assert.equal(writes[0].values.includes("Do not persist this"),false);
+  assert.deepEqual(JSON.parse(writes[0].values[12]),["assignment","technical_interview"]);
+});
+
+test("community insights aggregate only approved reports after the three-report privacy threshold",async()=>{
+  const reports=[
+    {stipend_band:"10000_20000",duration_band:"3_6_months",work_mode:"remote",payment_request:"no",outcome:"interviewed",recruitment_stages_json:'["assignment","technical_interview"]'},
+    {stipend_band:"5000_10000",duration_band:"3_6_months",work_mode:"remote",payment_request:"unsure",outcome:"offer_received",recruitment_stages_json:'["assignment","hr_interview"]'},
+    {stipend_band:"10000_20000",duration_band:"1_3_months",work_mode:"hybrid",payment_request:"yes",outcome:"joined",recruitment_stages_json:'["technical_interview"]'}
+  ];
+  const db={prepare(sql){return {sql,bind(...values){return {
+    run:async()=>({success:true}),
+    first:async()=>({count:1}),
+    all:async()=>({results:reports})
+  }}}}};
+  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/community/insights?companyName=ACME%20Technologies%20Limited&website=acme.example.in"),env({DB:db}),ctx);
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.insights.thresholdMet,true);
+  assert.equal(body.insights.reportCount,3);
+  assert.equal(body.insights.stages[0].value,"technical_interview");
+  assert.equal(body.insights.stages[0].count,2);
+  assert.equal(body.insights.paymentRequests.reportedYes,1);
+  assert.equal(JSON.stringify(body).includes("Private Recruiter"),false);
+});
+
+test("community contributions can be deleted using the one-time token",async()=>{
+  let deleteArgs=[];
+  const db={prepare(sql){return {bind(...values){return {
+    run:async()=>{if(sql.startsWith("DELETE FROM community_reports"))deleteArgs=values;return {success:true,meta:{changes:1}}},
+    first:async()=>({count:1})
+  }}}}};
+  const token="a".repeat(48);
+  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/community/reports/123e4567-e89b-12d3-a456-426614174000",{
+    method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({deletionToken:token})
+  }),env({DB:db}),ctx);
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.deleted,true);
+  assert.equal(deleteArgs[0],"123e4567-e89b-12d3-a456-426614174000");
+  assert.notEqual(deleteArgs[1],token);
+});
