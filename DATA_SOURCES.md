@@ -9,7 +9,8 @@ OfferShield distinguishes official government datasets, official company stateme
 | MCA Company Master Data via data.gov.in | CIN/LLPIN, legal name, status, class/category, registration date, state, RoC, capital and registered-office fields present in the published dataset | Cloudflare Worker connector; requires a free data.gov.in API key |
 | MCA Corporate Data Management | Manual recheck against the official MCA portal | Official manual lookup |
 | GST taxpayer search | GSTIN/legal taxpayer detail check | Official manual lookup; no automation in this release |
-| Udyam verification | MSME registration check | Official manual lookup; CAPTCHA may apply |
+| Udyam registered units under UDYAM | Regional MSME unit listing by State and District | Cloudflare Worker connector; requires the same data.gov.in API key as MCA |
+| Udyam verification portal | Exact Udyam certificate/number check | Official manual lookup; CAPTCHA may apply |
 | EPFO establishment search | Employer establishment context | Official manual lookup |
 | National Career Service | Employment guidance and recruitment notices | Official public portal |
 | National Cyber Crime Reporting Portal | Cybercrime reporting | Official public portal |
@@ -26,6 +27,18 @@ OfferShield distinguishes official government datasets, official company stateme
 - Dataset does not establish who employs an individual recruiter or whether a given job offer was authorised.
 
 The data.gov.in platform documents API key generation for registered users. See https://www.data.gov.in/help.
+
+### Udyam registered-units dataset
+
+- Resource title: List of MSME Registered Units under UDYAM
+- Resource ID: `8b68ae56-84cf-4728-a0a6-1be11028dea7`
+- Endpoint: `https://api.data.gov.in/resource/8b68ae56-84cf-4728-a0a6-1be11028dea7`
+- Required filters: `filters[State]` and `filters[District]`
+- Other request parameters: `api-key`, `format=json`, `limit`, `offset`
+- Exposed fields: `LG_ST_Code`, `State`, `LG_DT_Code`, `District`, `Pincode`, `RegistrationDate`, `EnterpriseName`, `CommunicationAddress`, `Activities`.
+- This dataset does **not** expose a Udyam Registration Number field. It supports regional enterprise discovery and name/location cross-checks; it cannot independently validate a specific Udyam number or certificate.
+- An empty `records` array with `total: 0` from an unfiltered call does not prove there are no MSMEs. Supply the required State and District filters and use pagination.
+- The same data.gov.in API key is used for both MCA and Udyam resources. Keep it as the Cloudflare Worker secret `DATA_GOV_API_KEY`; never paste it into browser code or GitHub.
 
 ## Third-party company discovery
 
