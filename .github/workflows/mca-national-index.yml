@@ -26,10 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
-      DATA_GOV_API_KEY: \${{ secrets.DATA_GOV_API_KEY }}
-      CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      AWS_ACCESS_KEY_ID: \${{ secrets.R2_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: \${{ secrets.R2_SECRET_ACCESS_KEY }}
+      DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto
       R2_BUCKET_NAME: offershield-company-index
     steps:
@@ -89,7 +89,7 @@ jobs:
       - name: Download and persist MCA pages to R2
         shell: bash
         env:
-          MAX_RECORDS: \${{ inputs.max_records }}
+          MAX_RECORDS: ${{ inputs.max_records }}
         run: |
           set -euo pipefail
           if [ "$MAX_RECORDS" = "0" ]; then
@@ -133,7 +133,7 @@ jobs:
       - name: Verify index coverage before publishing
         shell: bash
         env:
-          MAX_RECORDS: \${{ inputs.max_records }}
+          MAX_RECORDS: ${{ inputs.max_records }}
         run: |
           set -euo pipefail
           node --input-type=module -e '
@@ -162,7 +162,7 @@ jobs:
       - name: Publish complete index or isolated staging test
         shell: bash
         env:
-          MAX_RECORDS: \${{ inputs.max_records }}
+          MAX_RECORDS: ${{ inputs.max_records }}
         run: |
           set -euo pipefail
           if [ "$MAX_RECORDS" = "0" ]; then
