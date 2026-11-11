@@ -683,6 +683,7 @@ async function analyseInternshipUpload(request, env, origin) {
   }
 
   let extracted = "";
+  let documentProcessingWarnings = [];
   if (documents.length) {
     let converted;
     try { converted = await env.AI.toMarkdown(documents); }
@@ -692,6 +693,10 @@ async function analyseInternshipUpload(request, env, origin) {
       if (item && item.format === "error") return "[Could not extract " + cleanText(item.name,100) + "]";
       return "[Evidence file: " + cleanText(item && item.name,100) + "]\n" + cleanText(item && item.data,9000);
     }).join("\n\n").slice(0,28000);
+    var documentProcessingWarnings = list
+      .filter(item => !item || item.format === "error" || !String(item.data || "").trim())
+      .map(item => cleanText(item && item.name,100) + ": text extraction was incomplete or returned no text.")
+      .filter(Boolean);
   }
 
   const evidence = [
@@ -952,6 +957,7 @@ async function analyseInternshipUpload(request, env, origin) {
     extracted:{emails:emailMatches,urls,domains,phones:[...new Set(evidence.match(/(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}\b/g)||[])],cins,gstins,paymentSignals:paymentLines},
     domainChecks,digitalFootprintSearches:searchLinks,
     uploadedEvidence:fileInfo.map(x=>({name:x.name,type:x.type,bytes:x.bytes,processed:true})),
+    documentProcessingWarnings,
     privacy:{filesPersisted:false,note:"Original files are processed for this request and are not saved by OfferShield. The student may save the resulting summary. Do not upload Aadhaar, PAN, bank details or passwords."},
     checkedAt:new Date().toISOString(),
     limitations:[
