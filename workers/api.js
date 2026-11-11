@@ -810,7 +810,7 @@ async function analyseInternshipUpload(request, env, origin) {
       offsetsChecked:checked,
       matchedRecords:udyamRecords.length,
       note:udyamRecords.length
-        ? "Name matches were found on the searched Udyam result page(s); they are enterprise-list candidates, not exact Udyam certificate verification."
+        ? "Name matches were found on the searched Udyam result page(s); they are enterprise-list candidates. This resource does not expose a Udyam Registration Number, so it cannot verify an exact Udyam certificate."
         : "No name match appeared in the first searched pages for this State and District. This does not prove that the enterprise is unregistered."
     };
   } else if (companyState || companyDistrict) {
