@@ -44,6 +44,7 @@ You need a Cloudflare account and a data.gov.in account. Do not send either acco
     `wrangler deploy`
 12. Copy the Worker URL (for example `https://offershield-intelligence.<your-subdomain>.workers.dev`).
 13. Open https://ambkeshwargupta.github.io/OfferShield/ → **Advanced search & intelligence** → **Intelligence API connection**. Paste the Worker URL, click **Connect API**, then **Test**.
+14. In the **Udyam registered-unit search** card, supply both State and District. The Worker uses the same `DATA_GOV_API_KEY` secret for the MCA and Udyam resource IDs.
 
 The GitHub Pages origin is already allowed in the Worker CORS list. To use a custom domain later, add that exact origin to `ALLOWED_ORIGINS` in `wrangler.toml` and redeploy.
 
