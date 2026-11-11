@@ -257,7 +257,7 @@ function companyIndexQuery(query) {
   const tokens = String(query || "").toLowerCase()
     .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
     .match(/[a-z0-9]+/g) || [];
-  return [...new Set(tokens)].filter(token => token.length >= 3 && !COMPANY_NAME_STOP_WORDS.has(token)).slice(0, 6);
+  return [...new Set(tokens)].filter(token => token.length >= 3 && !COMPANY_NAME_STOP_WORDS.has(token)).slice(0, 3);
 }
 
 async function searchR2CompanyIndex(env, query, limit = 12) {
@@ -278,13 +278,13 @@ async function searchR2CompanyIndex(env, query, limit = 12) {
         .map(item => String(item.key || "").split("/")[2])
         .filter(term => term && term.startsWith(token)))];
       allTerms.sort((a,b) => a === token ? -1 : b === token ? 1 : a.localeCompare(b));
-      const chosenTerms = allTerms.slice(0, 8);
+      const chosenTerms = allTerms.slice(0, 2);
       if (allTerms.length > chosenTerms.length) partial = true;
       const matches = new Map();
       for (const term of chosenTerms) {
         const partListing = await env.COMPANY_INDEX.list({ prefix:"mca/term/" + term + "/", limit:10 });
         if (partListing.truncated) partial = true;
-        const parts = (partListing.objects || []).slice(0, 5);
+        const parts = (partListing.objects || []).slice(0, 2);
         if ((partListing.objects || []).length > parts.length) partial = true;
         for (const part of parts) {
           const object = await env.COMPANY_INDEX.get(part.key);
