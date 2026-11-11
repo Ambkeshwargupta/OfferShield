@@ -5,10 +5,11 @@ This API is separate from GitHub Pages. GitHub Pages hosts the static premium we
 ## Current capabilities
 
 - MCA Company Master Data lookup through the data.gov.in resource (CIN and exact company-name filters).
+- Udyam MSME registered-unit lookup through resource `8b68ae56-84cf-4728-a0a6-1be11028dea7`, filtered by mandatory State and District parameters with optional local enterprise/activity/pincode matching within each returned page.
 - Wikidata third-party company discovery candidates.
 - CIN recognition and MCA company data query.
 - LLPIN recognition with correct manual MCA fallback; LLPIN is **not** sent to a CIN-only OGD filter.
-- GSTIN and Udyam recognition with official manual lookup routes.
+- GSTIN recognition with official manual lookup. Udyam regional enterprise-list lookup uses the data.gov.in resource; exact Udyam number/certificate verification remains an official manual step because this dataset does not expose a Udyam Registration Number field.
 - Company/domain/email input classification.
 - Domain intelligence: A, AAAA, MX, TXT, NS and DMARC DNS records.
 - Public RDAP registration-data lookup.
@@ -36,7 +37,7 @@ You need a Cloudflare account and a data.gov.in account. Do not send either acco
 8. Apply the D1 schema from the `workers` directory:
    `wrangler d1 execute offershield-intelligence --file=schema.sql --remote`
 9. Create a free account at https://data.gov.in/ and generate an API key from its API/account area. Review the catalogue at https://www.data.gov.in/catalog/company-master-data.
-10. Store the API key as a secret (while still in `workers`):
+10. Store the same data.gov.in API key used for the MCA resource as a secret (while still in `workers`):
     `wrangler secret put DATA_GOV_API_KEY`
     Paste the key into the terminal prompt. Do not put it in `wrangler.toml`, `.dev.vars.example`, HTML, browser storage or GitHub.
 11. Deploy:
@@ -52,7 +53,7 @@ The Worker defaults to resource ID `4dbe5667-7b6b-41d7-82af-211562424d9a`. If th
 
 ## Official source semantics
 
-The OGD Company Master Data feed is a periodic government-published snapshot. It is not a live MCA portal transaction and it does not prove that a specific recruiter, vacancy or offer is authorised. The exact CompanyName filter may miss punctuation, abbreviations or brand/legal-entity variations. Fuzzy suggestions are community discovery candidates only.
+The OGD Company Master Data feed is a periodic government-published snapshot. The Udyam MSME registered-units resource requires both `filters[State]` and `filters[District]`; its returned fields are `LG_ST_Code`, `State`, `LG_DT_Code`, `District`, `Pincode`, `RegistrationDate`, `EnterpriseName`, `CommunicationAddress` and `Activities`. The catalogue schema does not expose a Udyam Registration Number, so OfferShield can discover/list units by location and compare enterprise names, but cannot confirm a specific Udyam certificate/number from this resource alone. It is not a live MCA portal transaction and it does not prove that a specific recruiter, vacancy or offer is authorised. The exact CompanyName filter may miss punctuation, abbreviations or brand/legal-entity variations. Fuzzy suggestions are community discovery candidates only.
 
 This connector does not imply that all MCA filings, directors, charges, financial statements or LLP records are included. GST and Udyam remain official manual lookup flows in this release; no CAPTCHA bypass or restricted scraping is used.
 
