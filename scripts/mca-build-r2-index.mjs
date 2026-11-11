@@ -85,7 +85,7 @@ async function main() {
   const outputDir = path.resolve(String(options["output-dir"] || ".data/mca/r2-index"));
   const spoolDir = path.resolve(String(options["spool-dir"] || ".data/mca/r2-spool"));
   const spoolCount = Math.max(16, Math.min(256, Number(options["spool-count"]) || 64));
-  const shardSize = Math.max(250, Math.min(10000, Number(options["shard-size"]) || 10000));
+  const shardSize = Math.max(250, Math.min(10000, Number(options["shard-size"]) || 1000));
   await fs.access(input);
   await fs.rm(outputDir,{recursive:true,force:true});
   await fs.rm(spoolDir,{recursive:true,force:true});
