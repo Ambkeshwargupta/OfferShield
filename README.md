@@ -48,6 +48,9 @@ OfferShield is an India-first company and recruitment due-diligence platform foc
 - DNS-over-HTTPS and RDAP lookups.
 - Email header parser.
 - AI-assisted internship/offer investigation endpoint (POST /v1/investigate) using Workers AI Markdown Conversion and Llama 3.3 70B JSON-mode inference.
+- Automated public digital-footprint research via Tavily Search: supplied company website, indexed LinkedIn company pages, company history/news/partnerships, hiring and employee-review references, with source URLs and snippets displayed in the report. This is public search-index evidence, not direct LinkedIn verification.
+- Document-aware review that distinguishes new offer letters from completed-internship certificates and experience letters; missing offer terms or selection stages are not treated as risk signals for a completion certificate.
+- Deterministic recruiter-email checks distinguish a consumer mail provider from a role-based mailbox such as ops@ or hr@ and compare the email domain with the student-supplied website domain.
 - Community Recruitment Intelligence API: opt-in structured submissions, pending moderation, deletion tokens, aggregate-only public insights, a three-report privacy threshold and retrieval of approved patterns as AI context. Requires D1 plus migration 0003_community_intelligence.sql.
 - Screenshot/document evidence extraction, domain DNS/RDAP and pasted email-header clues, MCA indexed-name/CIN lookup, regional Udyam enterprise discovery and Wikidata candidates, plus structured student-facing assessment and, when D1 is configured, company-published verification contact cross-checks.
 - D1-backed API response cache and rate limit buckets when D1 is configured.
