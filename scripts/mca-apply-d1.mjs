@@ -42,7 +42,7 @@ async function main() {
   for (let index = 0; index < files.length; index++) {
     const file = path.join(directory, files[index]);
     console.log("[" + (index + 1) + "/" + files.length + "] " + files[index]);
-    await run("npx", ["wrangler", "d1", "execute", database, remote, "--file=" + file]);
+    await run(process.platform === "win32" ? "npx.cmd" : "npx", ["wrangler", "--config", "workers/wrangler.toml", "d1", "execute", database, remote, "--file=" + file]);
   }
   console.log("Import finished. Verify coverage with the SQL query in workers/README.md.");
 }
