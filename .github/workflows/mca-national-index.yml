@@ -40,6 +40,8 @@ jobs:
 
       - name: Validate credentials and dedicated R2 bucket
         shell: bash
+        env:
+          MAX_RECORDS: ${{ inputs.max_records }}
         run: |
           set -euo pipefail
           for name in DATA_GOV_API_KEY CLOUDFLARE_ACCOUNT_ID AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
@@ -53,6 +55,10 @@ jobs:
             sudo apt-get install -y awscli
           fi
           aws --version
+          if [ "$MAX_RECORDS" = "0" ] && [ -z "$(printenv CLOUDFLARE_API_TOKEN || true)" ]; then
+            echo "Missing required GitHub Actions secret for production Worker deployment: CLOUDFLARE_API_TOKEN"
+            exit 1
+          fi
           aws s3api head-bucket \
             --bucket "$R2_BUCKET_NAME" \
             --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com"
@@ -173,6 +179,16 @@ jobs:
             --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com" \
             --region auto --only-show-errors --no-progress
           echo "Published manifest to s3://$R2_BUCKET_NAME/$TARGET_PREFIX"
+
+
+      - name: Deploy updated intelligence Worker after full publication
+        if: inputs.max_records == '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global wrangler
+          printf '%s' "$DATA_GOV_API_KEY" | wrangler secret put DATA_GOV_API_KEY --config workers/wrangler.toml
+          wrangler deploy --config workers/wrangler.toml
 
       - name: Report import result
         run: |
