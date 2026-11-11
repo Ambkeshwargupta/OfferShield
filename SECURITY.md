@@ -12,3 +12,12 @@
 - The Node prototype uses browser-session ownership and local JSON persistence, not account authentication. It is not suitable for shared-device or multi-user production use.
 - GitHub Pages reports are stored in browser localStorage. Clearing browser data deletes that local report history.
 - Before public production launch, add user authentication, per-user database access policies, abuse monitoring, backups, incident response and a privacy/legal review.
+
+
+## Community contribution abuse controls
+
+Community reports are structured, contain no free-text allegation field, remain pending until manually reviewed, and are never displayed individually. The public insight endpoint exposes aggregates only after at least three approved reports match the company key/domain within 365 days. Submissions are rate-limited to three per hashed network identity per hour in addition to the general API limit. Deletion requires the one-time token returned at submission; only a hash of that token is stored.
+
+Moderators should approve only complete, plausible, policy-compliant structured submissions. Reject spam, personal information, threats, impersonation, duplicate floods, or content that attempts to identify individual candidates/recruiters. Do not treat a reported payment request or a single negative experience as proof of misconduct. Maintain a documented appeal/grievance route and periodically review old aggregates.
+
+The AI receives only aggregate counts, never individual reports. Community data is retrieval context, not model-weight training. Do not use unmoderated submissions or community patterns to automatically label a company fraudulent.
