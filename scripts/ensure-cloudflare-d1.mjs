@@ -13,7 +13,7 @@ if (configuredAccountId !== verifiedAccountId) {
 }
 // Correct the value for later steps (Wrangler deploy and secret upload) as well.
 if (process.env.GITHUB_ENV) {
-  await appendFile(process.env.GITHUB_ENV, "CLOUDFLARE_ACCOUNT_ID=" + verifiedAccountId + "\\n");
+  await appendFile(process.env.GITHUB_ENV, "CLOUDFLARE_ACCOUNT_ID=" + verifiedAccountId + "\n");
 }
 const accountId = verifiedAccountId;
 
