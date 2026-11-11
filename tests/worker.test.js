@@ -339,10 +339,22 @@ test("AI internship review parses uploaded files and separates claimed stages fr
   form.set("messageText","Please review this internship opportunity.");
   form.append("files",new File([Buffer.from("synthetic PDF fixture")],"internship-offer.pdf",{type:"application/pdf"}),"internship-offer.pdf");
 
-  const response=await worker.fetch(
-    new Request("https://api.example.workers.dev/v1/investigate",{method:"POST",body:form}),
-    env({AI:ai}),ctx
-  );
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async input=>{
+    const url=new URL(input);
+    if(url.hostname==="dns.google") return new Response(JSON.stringify({Status:0,Answer:[]}),{status:200,headers:{"content-type":"application/json"}});
+    if(url.hostname==="rdap.org") return new Response(JSON.stringify({ldhName:"example-startup.in",status:[],events:[],entities:[]}),{status:200,headers:{"content-type":"application/json"}});
+    return new Response(JSON.stringify({search:[]}),{status:200,headers:{"content-type":"application/json"}});
+  };
+  let response;
+  try {
+    response=await worker.fetch(
+      new Request("https://api.example.workers.dev/v1/investigate",{method:"POST",body:form}),
+      env({AI:ai}),ctx
+    );
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
   const body=await response.json();
   assert.equal(response.status,200);
   assert.deepEqual(convertedNames,["internship-offer.pdf"]);
