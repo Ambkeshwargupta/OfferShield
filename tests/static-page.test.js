@@ -24,6 +24,27 @@ test("static Pages edition stores reports in the browser and does not require se
   assert.match(html, /function DEMO_COMPANIES|const DEMO_COMPANIES/);
 });
 
+test("internship investigation distinguishes past certificates from new offers", () => {
+  assert.match(html, /id="reviewPurpose"/);
+  assert.match(html, /value="past_internship"/);
+  assert.match(html, /value="certificate_review"/);
+  assert.match(html, /completed-internship certificate/i);
+  assert.match(html, /document classification/i);
+});
+
+test("public digital footprint report displays indexed LinkedIn, history, jobs and source links", () => {
+  assert.match(html, /Public digital footprint research/);
+  assert.match(html, /LinkedIn company page/);
+  assert.match(html, /History and news/);
+  assert.match(html, /Jobs and reviews/);
+  assert.match(html, /footprint-source/);
+  assert.match(html, /recruiterEmailEvidence/);
+});
+
+test("public search privacy notice excludes uploaded evidence and recruiter email from search provider", () => {
+  assert.match(html, /uploaded files, chat text and recruiter email address are not sent to that search provider/);
+});
+
 test("company search has an open-data fallback and manual path for unlisted companies", () => {
   assert.match(html, /searchOpenDataCompanies/);
   assert.match(html, /https:\/\/www\.wikidata\.org\/w\/api\.php\?action=wbsearchentities/);
