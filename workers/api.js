@@ -271,7 +271,7 @@ async function searchNationalCompanyIndex(env, query, limit = 12) {
       if (!tokens.length) return { configured:true, available:true, records:[], strategy:"no_searchable_tokens" };
       const match = tokens.map(token => '"' + token.replace(/"/g, '""') + '"*').join(" AND ");
       result = await env.DB.prepare(
-        "SELECT c.cin,c.name,c.status,c.company_class,c.category,c.sub_category,c.registration_date,c.state,c.roc,c.authorized_capital,c.paid_up_capital,c.registered_office,c.listing_status,c.industrial_classification,c.source_updated_at FROM companies_fts f JOIN companies c ON c.rowid=f.rowid WHERE companies_fts MATCH ? ORDER BY bm25(companies_fts), c.name LIMIT ?"
+        "SELECT c.cin,c.name,c.status,c.company_class,c.category,c.sub_category,c.registration_date,c.state,c.roc,c.authorized_capital,c.paid_up_capital,c.registered_office,c.listing_status,c.industrial_classification,c.source_updated_at FROM companies_fts JOIN companies c ON c.rowid=companies_fts.rowid WHERE companies_fts MATCH ? ORDER BY bm25(companies_fts), c.name LIMIT ?"
       ).bind(match, limit).all();
       strategy = "fts5_all_tokens_prefix";
       if (!(result.results || []).length) {
