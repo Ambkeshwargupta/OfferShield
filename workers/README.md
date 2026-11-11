@@ -123,7 +123,7 @@ The existing `DATA_GOV_API_KEY` repository secret is reused. No key is written t
 
 #### 4. Deploy the Worker with the R2 binding
 
-The `workers/wrangler.toml` file now includes the `COMPANY_INDEX` R2 binding. After the bucket exists and the four secrets above are added, open **GitHub → Actions → Deploy OfferShield intelligence Worker → Run workflow**. That workflow stores `DATA_GOV_API_KEY` as a Worker secret and deploys the Worker using the R2 binding.
+The `workers/wrangler.toml` file includes the `COMPANY_INDEX` R2 binding. For a Worker-only deployment, open **GitHub → Actions → Deploy OfferShield intelligence Worker → Run workflow**. That workflow stores `DATA_GOV_API_KEY` as a Worker secret and deploys the Worker using the R2 binding. The full MCA import workflow also deploys the updated Worker automatically after it publishes a complete national index; the `CLOUDFLARE_API_TOKEN` secret is therefore required for a full (`max_records=0`) import.
 
 Alternatively, from the repository's `workers` directory run:
 
