@@ -53,7 +53,14 @@ function compact(row) {
     t:row.state || null,
     d:row.registrationDate || null,
     c:row.companyClass || null,
-    r:row.roc || null
+    r:row.roc || null,
+    g:row.category || null,
+    u:row.subCategory || null,
+    a:row.authorizedCapital || null,
+    p:row.paidUpCapital || null,
+    o:row.registeredOffice || null,
+    l:row.listingStatus || null,
+    x:row.industrialClassification || null
   };
 }
 async function writeChunk(outputDir, token, rows, partNo) {
