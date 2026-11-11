@@ -378,7 +378,9 @@ function refreshWorkerStatus(){
 }
 async function workerRequest(path,options={}){
  const base=workerApiBase();if(!base)throw new Error("Connect your Cloudflare Worker URL first.");
- const response=await fetch(base+path,{...options,headers:{"content-type":"application/json",...(options.headers||{})}});
+ const headers={...(options.headers||{})};
+ if(options.body && !(options.body instanceof FormData) && !headers["content-type"])headers["content-type"]="application/json";
+ const response=await fetch(base+path,{...options,headers});
  const data=await response.json().catch(()=>({}));
  if(!response.ok)throw new Error(data.error?.message||"Intelligence API request failed.");
  return data;
@@ -530,7 +532,7 @@ async function buildRecruiterChecks(){
 }
 async function testWorkerConnection(){
  if(!workerApiBase()){toast("Paste your Worker URL first.");return}
- try{const data=await workerRequest("/v1/health");$("#workerStatus").textContent="Connected · "+(data.d1Configured?"D1 enabled":"D1 not configured");$("#workerStatus").className="tag official";$("#workerApiHint").textContent="MCA OGD key: "+(data.officialOgdConfigured?"configured":"not configured")+" · D1: "+(data.d1Configured?"connected":"not connected");toast("Worker API connection successful.")}catch(error){$("#workerStatus").textContent="Connection error";$("#workerStatus").className="tag warning";toast(error.message)}
+ try{const data=await workerRequest("/v1/health");$("#workerStatus").textContent="Connected · "+(data.aiConfigured?"AI enabled":"AI not enabled");$("#workerStatus").className="tag "+(data.aiConfigured?"official":"demo");$("#workerApiHint").textContent="MCA OGD key: "+(data.officialOgdConfigured?"configured":"not configured")+" · D1: "+(data.d1Configured?"connected":"not connected")+" · Workers AI: "+(data.aiConfigured?"enabled":"not enabled");toast(data.aiConfigured?"Worker and AI are connected.":"Worker connected, but enable Workers AI for file analysis.")}catch(error){$("#workerStatus").textContent="Connection error";$("#workerStatus").className="tag warning";toast(error.message)}
 }
 function saveAdvancedReport(){
  const content=$("#advancedSearchResult").innerText+"\n\n"+$("#domainResult").innerText+"\n\n"+$("#headerResult").innerText;
@@ -539,10 +541,72 @@ function saveAdvancedReport(){
 }
 
 function findingHTML(f){const glyph=f.state==="match"?"✓":f.state==="warning"?"!":"i";return '<div class="finding"><div class="finding-icon '+esc(f.state)+'">'+glyph+'</div><div><h4>'+esc(f.title)+'</h4><p>'+esc(f.detail)+'</p></div></div>'}
-function resultHTML(r){const c=r.company;return '<div class="card"><div class="result-head"><div><div class="eyebrow">Evidence review</div><h3>'+(c?esc(c.name):"Message analysis")+'</h3><p class="small muted" style="margin-top:5px">'+esc(r.summary)+'</p></div><span class="tag '+(r.findings.some(f=>f.state==="warning")?"demo":"")+'">'+(r.status==="company_only"?"Company information only":r.findings.some(f=>f.state==="warning")?"Review required":"Insufficient evidence")+'</span></div><div style="margin-top:14px">'+r.findings.map(findingHTML).join("")+'</div><div class="section-title"><h2>Extracted details</h2></div><div class="detail-list">'+[['Email addresses',r.fields.emails.join(", ")||"Not found"],['Website / URL domains',r.fields.domains.join(", ")||"Not found"],['Phone numbers',r.fields.phones.join(", ")||"Not found"],['Role clue',r.fields.role||"Not found"],['CIN patterns',r.fields.cins.join(", ")||"Not found"],['GSTIN patterns',r.fields.gstins.join(", ")||"Not found"],['Payment-related phrases',r.fields.paymentSignals.join(" · ")||"Not found"]].map(x=>'<div class="detail-row"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join("")+'</div><div class="note" style="margin-top:16px"><strong>Coverage limitation:</strong> This is a heuristic comparison of pasted text with the small company reference set. It cannot validate email headers, mailbox ownership, recruiter employment, vacancy approval, signatures or offer status. No numerical fraud probability is generated.</div><div class="quick"><button class="btn primary" id="saveReportBtn">Save investigation</button><button class="btn" id="printAnalysisBtn">Print / Save PDF</button></div></div>'}
-async function runAnalysis(){const text=$("#offerText").value.trim(),companyId=$("#investigateCompany").value;if(!text&&!companyId){toast("Paste a message or choose a company first.");return}const btn=$("#analyseBtn");btn.disabled=true;btn.textContent="Analysing…";try{lastInput=text;lastAnalysis=await api("/api/analyse",{method:"POST",body:JSON.stringify({text,companyId})});$("#analysisResult").classList.remove("hidden");$("#analysisResult").innerHTML=resultHTML(lastAnalysis);$("#saveReportBtn").onclick=saveReport;$("#printAnalysisBtn").onclick=()=>window.print();$("#analysisResult").scrollIntoView({behavior:"smooth",block:"start"})}catch(e){toast(e.message)}finally{btn.disabled=false;btn.textContent="Analyse evidence →"}}
-async function saveReport(){try{const data=await api("/api/reports",{method:"POST",body:JSON.stringify({title:$("#reportTitle").value||"Recruitment investigation",companyId:$("#investigateCompany").value,text:lastInput})});toast("Investigation saved in this browser session.");$("#statReports").textContent=String(Number($("#statReports").textContent||0)+1);go("reports")}catch(e){toast(e.message)}}
-async function loadReports(){try{const data=await api("/api/reports");$("#statReports").textContent=data.reports.length;if(!data.reports.length){$("#reportsList").innerHTML='<div class="empty"><b>No saved investigations yet</b>Analyse a recruitment message and save the evidence report to keep it in this browser session.</div>';return}$("#reportsList").innerHTML=data.reports.map(r=>'<div class="report-row"><div><h3>'+esc(r.title)+'</h3><p>'+esc(r.companyName||"Company not matched")+' · '+new Date(r.createdAt).toLocaleString()+' · '+esc(r.status.replaceAll("_"," "))+'</p></div><div class="quick"><button class="btn" data-report="'+esc(r.id)+'">Open report →</button><button class="btn danger" data-delete="'+esc(r.id)+'">Delete</button></div></div>').join("")}catch(e){$("#reportsList").innerHTML='<div class="empty">'+esc(e.message)+'</div>'}}
+function aiList(items,empty){const rows=Array.isArray(items)?items.filter(Boolean):[];return rows.length?'<ul>'+rows.map(x=>'<li>'+esc(typeof x==="string"?x:(x.title||"")+(x.detail?": "+x.detail:""))+'</li>').join("")+'</ul>':'<p>'+esc(empty||"Not established from the supplied evidence.")+'</p>'}
+function aiPanel(title,items,empty){return '<div class="analysis-panel"><h4>'+esc(title)+'</h4>'+aiList(items,empty)+'</div>'}
+function resultHTML(r){
+ if(r&&r.aiEnabled){
+  const risk=r.verdict||"insufficient_evidence",co=r.company||{},offer=r.offer||{},st=r.recruitmentStages||{},mca=co.mcaMatches||[],ex=r.extracted||{};
+  const label=risk==="high_risk"?"High risk signals":risk==="caution"?"Caution · verify first":risk==="mixed"?"Mixed evidence":"Insufficient evidence";
+  const mcaRows=mca.length?mca.map(x=>'<div class="detail-row"><span>'+esc(x.name||"MCA record")+'</span><b>'+esc([x.identifier,x.status].filter(Boolean).join(" · ")||"Record found")+'</b></div>').join(""):'<div class="note">No MCA match returned. This is not proof of fraud; try the exact legal name/CIN and check the relevant legal form manually.</div>';
+  const domains=(r.domainChecks||[]).map(x=>'<div class="analysis-panel"><h4>'+esc(x.domain)+'</h4><p>MX: '+(x.emailSecurity?.mxPresent?"Present":"Not found")+' · SPF: '+(x.emailSecurity?.spfPresent?"Present":"Not found")+' · DMARC: '+(x.emailSecurity?.dmarcPresent?"Present":"Not found")+'</p><p>RDAP: '+esc(x.registration?.ldhName||"Unavailable")+'</p><p class="analysis-meta">Technical signals only, not proof of company ownership.</p></div>').join("");
+  const links=(r.digitalFootprintSearches||[]).map(x=>'<a class="btn" href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">'+esc(x.label)+' ↗</a>').join("");
+  const files=(r.uploadedEvidence||[]).map(x=>'<span class="tag">'+esc(x.name)+' · analysed</span>').join(" ");
+  return '<div class="card"><div class="eyebrow">AI-assisted student due diligence · '+esc(new Date(r.checkedAt||Date.now()).toLocaleString())+'</div><div class="verdict-banner '+esc(risk)+'"><strong>'+esc(r.headline||label)+'</strong><p>'+esc(r.summary||"Review the evidence before deciding.")+'</p><div class="quick"><span class="tag">'+esc(label)+'</span><span class="tag">Risk: '+esc(r.riskLevel||"Unknown")+'</span></div></div>'+
+   '<div class="analysis-grid"><div class="analysis-panel"><h4>Company identity · MCA</h4><p>'+esc(co.claimedName||"Not identified")+'</p>'+mcaRows+'<p class="analysis-meta">'+(co.mcaSearch?.available?"National MCA search available":"MCA index/API not established")+(co.mcaSearch?.partial?" · search may be partial":"")+'</p></div><div class="analysis-panel"><h4>Internship / offer terms</h4><div class="detail-list">'+[['Role',offer.role],['Stipend',offer.stipend],['Duration',offer.duration],['Location / work mode',offer.workModeAndLocation]].map(x=>'<div class="detail-row"><span>'+esc(x[0])+'</span><b>'+esc(x[1]||"Not stated")+'</b></div>').join("")+'</div></div></div>'+
+   '<div class="analysis-section"><h4>Recruitment stages</h4><div class="note">'+(st.companyStagesConfirmed?"The supplied evidence explicitly mentions stages, but independently confirm the employer's current process.":"No company-specific stages are confirmed. Generic possibilities are shown separately.")+'</div><div class="analysis-grid">'+aiPanel("Stages stated in supplied evidence",st.explicitStages,"No explicit stages were found.")+aiPanel("Typical possible stages · not company-confirmed",st.typicalPossibleStages,"No typical stage suggestions returned.")+'</div><p class="small muted">'+esc(st.note||"Ask the employer for the official selection process.")+'</p></div>'+
+   '<div class="analysis-grid">'+aiPanel("Risk indicators",r.redFlags,"No obvious risk indicator detected. This does not prove authenticity.")+aiPanel("Consistency signals",r.consistencySignals,"No strong consistency signal established.")+aiPanel("Missing information",r.missingInformation,"No additional gaps listed.")+aiPanel("Questions to ask",r.questionsToAsk,"Ask for a written JD, stipend, duration, mentor and official contact.")+aiPanel("Recommended next steps",r.nextSteps,"Cross-check through independently published company channels.")+'</div>'+
+   '<div class="analysis-section"><h4>Digital footprint & domain signals</h4>'+(domains?'<div class="analysis-grid">'+domains+'</div>':'<p class="small muted">No company/recruiter domain available for this scan.</p>')+'<div class="note" style="margin-top:10px">Search links are discovery routes; their results are not automatically verified.</div><div class="analysis-links">'+links+'</div></div>'+
+   '<div class="analysis-section"><h4>Uploaded evidence</h4><div class="quick">'+(files||'<span class="small muted">No files uploaded.</span>')+'</div><p class="analysis-meta">'+esc(r.privacy?.note||"Original files are not included in saved reports.")+'</p></div>'+
+   '<div class="analysis-section"><h4>Extracted indicators</h4><div class="detail-list">'+[['Emails',(ex.emails||[]).join(", ")],['Domains',(ex.domains||[]).join(", ")],['URLs',(ex.urls||[]).join(", ")],['Payment phrases',(ex.paymentSignals||[]).join(" · ")]].map(x=>'<div class="detail-row"><span>'+esc(x[0])+'</span><b>'+esc(x[1]||"Not found")+'</b></div>').join("")+'</div></div>'+
+   '<div class="note" style="margin-top:18px"><strong>Limitations:</strong> '+(r.limitations||[]).map(esc).join("<br>")+'</div><div class="quick"><button class="btn primary" id="saveReportBtn">Save investigation</button><button class="btn" id="printAnalysisBtn">Print / Save PDF</button></div></div>';
+ }
+ const c=r.company;return '<div class="card"><div class="result-head"><div><div class="eyebrow">Evidence review</div><h3>'+(c?esc(c.name):"Message analysis")+'</h3><p class="small muted" style="margin-top:5px">'+esc(r.summary)+'</p></div><span class="tag '+(r.findings.some(f=>f.state==="warning")?"demo":"")+'">'+(r.status==="company_only"?"Company information only":r.findings.some(f=>f.state==="warning")?"Review required":"Insufficient evidence")+'</span></div><div style="margin-top:14px">'+r.findings.map(findingHTML).join("")+'</div><div class="section-title"><h2>Extracted details</h2></div><div class="detail-list">'+[['Email addresses',r.fields.emails.join(", ")||"Not found"],['Website / URL domains',r.fields.domains.join(", ")||"Not found"],['Phone numbers',r.fields.phones.join(", ")||"Not found"],['Role clue',r.fields.role||"Not found"],['CIN patterns',r.fields.cins.join(", ")||"Not found"],['GSTIN patterns',r.fields.gstins.join(", ")||"Not found"],['Payment-related phrases',r.fields.paymentSignals.join(" · ")||"Not found"]].map(x=>'<div class="detail-row"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join("")+'</div><div class="note" style="margin-top:16px"><strong>Coverage limitation:</strong> Connect the Cloudflare Worker with Workers AI to analyse screenshots and documents.</div><div class="quick"><button class="btn primary" id="saveReportBtn">Save investigation</button><button class="btn" id="printAnalysisBtn">Print / Save PDF</button></div></div>';
+}
+function renderOfferFileList(){
+ const files=[...($("#offerFiles").files||[])],box=$("#offerFileList");
+ if(!files.length){box.innerHTML='<span class="small muted">No files selected. Screenshots of chats and offer letters can be added here.</span>';return}
+ const total=files.reduce((sum,file)=>sum+file.size,0);
+ box.innerHTML=files.map(file=>'<span class="file-chip">▤ '+esc(file.name)+' · '+(file.size/1024/1024).toFixed(2)+' MB</span>').join("")+'<span class="small muted" style="align-self:center">'+files.length+' file(s) · '+(total/1024/1024).toFixed(2)+' MB</span>';
+}
+async function runAnalysis(){
+ const text=$("#offerText").value.trim(),companyId=$("#investigateCompany").value,selected=$("#investigateCompany").selectedOptions[0]?.textContent||"";
+ const companyName=$("#offerCompanyName").value.trim()||((companyId&&selected!=="No reference profile selected")?selected:"");
+ const files=[...($("#offerFiles").files||[])],total=files.reduce((sum,file)=>sum+file.size,0);
+ if(files.length>5){toast("Upload no more than five files.");return}
+ if(total>12*1024*1024){toast("Keep the combined upload below 12 MB.");return}
+ if(!text&&!companyName&&!files.length){toast("Enter a company name, paste the message or upload evidence.");return}
+ const btn=$("#analyseBtn");btn.disabled=true;btn.textContent="Reading evidence & checking sources…";
+ try{
+  lastInput=text;
+  if(workerApiBase()){
+   const form=new FormData();
+   form.append("companyName",companyName);form.append("website",$("#offerWebsite").value.trim());
+   form.append("role",$("#offerRole").value.trim());form.append("recruiterName",$("#offerRecruiter").value.trim());
+   form.append("recruiterEmail",$("#offerRecruiterEmail").value.trim());form.append("jobSourceUrl",$("#offerSourceUrl").value.trim());
+   form.append("messageText",text);for(const file of files)form.append("files",file,file.name);
+   lastAnalysis=await workerRequest("/v1/investigate",{method:"POST",body:form});
+  }else{
+   if(files.length)throw new Error("Connect your Cloudflare Worker with Workers AI enabled to analyse screenshots, PDFs and offer letters. Text-only checking remains available without it.");
+   let fallbackCompanyId=companyId;
+   if(companyName&&!fallbackCompanyId){const manual=createManualCompany(companyName);fallbackCompanyId=manual.id}
+   lastAnalysis=await api("/api/analyse",{method:"POST",body:JSON.stringify({text,companyId:fallbackCompanyId})});
+   lastAnalysis.localOnly=true;
+  }
+  $("#analysisResult").classList.remove("hidden");$("#analysisResult").innerHTML=resultHTML(lastAnalysis);
+  $("#saveReportBtn").onclick=saveReport;$("#printAnalysisBtn").onclick=()=>window.print();
+  $("#analysisResult").scrollIntoView({behavior:"smooth",block:"start"});
+ }catch(e){toast(e.message);$("#analysisResult").classList.remove("hidden");$("#analysisResult").innerHTML='<div class="note">'+esc(e.message)+'</div>'}
+ finally{btn.disabled=false;btn.textContent="Analyse company & evidence →"}
+}
+async function saveReport(){
+ if(!lastAnalysis){toast("Run an investigation first.");return}
+ const title=$("#reportTitle").value.trim()||"Internship / offer investigation";
+ const companyName=lastAnalysis.company?.claimedName||lastAnalysis.company?.name||$("#offerCompanyName").value.trim()||"Company not identified";
+ const report={...lastAnalysis,id:"report-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7),title,companyName,createdAt:new Date().toISOString(),originalFilesSaved:false};
+ storeStaticReports([report,...staticReports()]);$("#statReports").textContent=String(staticReports().length);
+ toast("Analysis summary saved in this browser. Original files were not saved.");go("reports");
+}
+async function loadReports(){try{const data=await api("/api/reports");$("#statReports").textContent=data.reports.length;if(!data.reports.length){$("#reportsList").innerHTML='<div class="empty"><b>No saved investigations yet</b>Analyse a recruitment message and save the evidence report to keep it in this browser session.</div>';return}$("#reportsList").innerHTML=data.reports.map(r=>'<div class="report-row"><div><h3>'+esc(r.title)+'</h3><p>'+esc(r.companyName||r.company?.claimedName||"Company not matched")+' · '+new Date(r.createdAt).toLocaleString()+' · '+esc(r.status.replaceAll("_"," "))+'</p></div><div class="quick"><button class="btn" data-report="'+esc(r.id)+'">Open report →</button><button class="btn danger" data-delete="'+esc(r.id)+'">Delete</button></div></div>').join("")}catch(e){$("#reportsList").innerHTML='<div class="empty">'+esc(e.message)+'</div>'}}
 async function openReport(id){try{const {report:r}=await api("/api/reports/"+encodeURIComponent(id));go("report-detail");$("#reportDetailTitle").textContent=r.title;$("#reportDetailDate").textContent=new Date(r.createdAt).toLocaleString()+" · "+(r.companyName||"Company not matched");$("#reportDetail").innerHTML=resultHTML({company:r.companyName?{name:r.companyName}:null,summary:r.summary,findings:r.findings,fields:r.fields,status:r.status}).replace('id="saveReportBtn"','id="unusedSave" disabled').replace('id="printAnalysisBtn"','id="unusedPrint" disabled');}catch(e){toast(e.message)}}
 async function removeReport(id){try{await api("/api/reports/"+encodeURIComponent(id),{method:"DELETE"});toast("Report deleted.");loadReports();const v=await api("/api/reports");$("#statReports").textContent=v.reports.length}catch(e){toast(e.message)}}
 $("#heroSearchBtn").onclick=()=>{$("#companySearch").value=$("#heroSearch").value;go("companies");filterCompanies()};
@@ -595,9 +659,10 @@ async function filterCompanies(){
   }
  },380);
 }
+$("#offerFiles").addEventListener("change",renderOfferFileList);
 $("#analyseBtn").onclick=runAnalysis;
 $("#sampleBtn").onclick=()=>{$("#investigateCompany").value="tcs";$("#reportTitle").value="Synthetic demo — internship message domain comparison";$("#offerText").value="Subject: Internship Selection — Tata Consultancy Services\n\nCongratulations! You have been shortlisted for the Software Development Intern role at Tata Consultancy Services.\n\nPlease continue your onboarding at https://tcs-careers.example/apply and contact recruiter@tcs-careers.example for the next steps.\n\nThis is a fictional training example using the reserved .example domain. It is not a real company communication.";toast("Synthetic example loaded. It does not describe a real employer message.")};
-$("#clearBtn").onclick=()=>{$("#offerText").value="";$("#reportTitle").value="";$("#analysisResult").classList.add("hidden");lastAnalysis=null;lastInput=""};
+$("#clearBtn").onclick=()=>{$("#offerText").value="";$("#reportTitle").value="";$("#offerCompanyName").value="";$("#offerWebsite").value="";$("#offerRole").value="";$("#offerRecruiter").value="";$("#offerRecruiterEmail").value="";$("#offerSourceUrl").value="";$("#offerFiles").value="";renderOfferFileList();$("#analysisResult").classList.add("hidden");lastAnalysis=null;lastInput=""};
 $("#refreshReports").onclick=loadReports;$("#printReport").onclick=()=>window.print();
 $("#mobileMenu").onclick=()=>$("#sidebar").classList.toggle("open");
 $$(".nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.page)));
