@@ -496,3 +496,136 @@ test("community contributions can be deleted using the one-time token",async()=>
   assert.equal(deleteArgs[0],"123e4567-e89b-12d3-a456-426614174000");
   assert.notEqual(deleteArgs[1],token);
 });
+
+
+test("completed internship certificate is not scored as a failed new offer; MCA name variants, company footprint and matching role email are surfaced",async()=>{
+  const requestedMcaNames=[];
+  const tavilyQueries=[];
+  let modelInput="";
+  const ai={
+    async toMarkdown(documents){
+      return documents.map(item=>({
+        name:item.name,format:"markdown",
+        data:"This is to certify that Ambkeshwar Gupta successfully completed an internship as Digital Marketing Intern at Afthonia Lab. Internship period: 1 June 2025 to 31 August 2025. Signed by the Operations Team."
+      }));
+    },
+    async run(model,input){
+      modelInput=input.messages.map(message=>message.content).join("\n");
+      return {response:{
+        verdict:"high_risk",riskLevel:"high",
+        headline:"High risk: company cannot be verified",
+        summary:"No MCA record, no stipend and no recruitment stages were found.",
+        claimedCompany:"Afthonia Lab Pvt Ltd",
+        documentType:"internship_certificate",
+        documentFacts:["Names Ambkeshwar Gupta as the intern.","States Digital Marketing Intern as the role.","States an internship period from 1 June to 31 August 2025."],
+        role:"Digital Marketing Intern",stipend:"Not stated",duration:"3 months",workModeAndLocation:"Not stated",
+        explicitRecruitmentStages:[],companyStagesConfirmed:false,typicalPossibleStages:[],stageNote:"This is a completion certificate, not a new-offer process.",
+        redFlags:["No MCA records found","The recruiter email is a generic email service","No stipend stated","No official contact in source register"],
+        consistencySignals:[],missingInformation:["Offer letter terms were not supplied."],
+        questionsToAsk:["Can the issuer confirm the certificate using an independently published contact?"],
+        nextSteps:["Verify the certificate issuer, dates and signatory against the official company website."]
+      }};
+    }
+  };
+  const form=new FormData();
+  form.set("companyName","Afthonia Lab Pvt Ltd");
+  form.set("website","https://www.afthonialab.com/");
+  form.set("role","Digital Marketing Intern");
+  form.set("recruiterEmail","ops@afthonialab.com");
+  form.set("reviewPurpose","auto");
+  form.set("messageText","I completed this internship and want to check the company and certificate issuer.");
+  form.append("files",new File([Buffer.from("synthetic certificate fixture")],"Internship Certificate - Ambkeshwar Gupta (1).pdf",{type:"application/pdf"}),"Internship Certificate - Ambkeshwar Gupta (1).pdf");
+
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async(input,init={})=>{
+    const url=new URL(input);
+    if(url.hostname==="dns.google"){
+      const type=url.searchParams.get("type");
+      const answer=type==="MX"?[{data:"10 mx.afthonialab.com",TTL:300}]
+        :type==="TXT"?[{data:'"v=spf1 include:_spf.google.com ~all"',TTL:300}]
+        :type==="A"?[{data:"203.0.113.10",TTL:300}]:[];
+      return new Response(JSON.stringify({Status:0,Answer:answer}),{status:200,headers:{"content-type":"application/json"}});
+    }
+    if(url.hostname==="rdap.org") return new Response(JSON.stringify({ldhName:"afthonialab.com",status:["active"],events:[],entities:[]}),{status:200,headers:{"content-type":"application/json"}});
+    if(url.hostname==="www.data.gov.in"){
+      const name=url.searchParams.get("filters[CompanyName]");
+      if(name) requestedMcaNames.push(name);
+      const records=name==="AFTHONIA LAB"?[{
+        CompanyName:"AFTHONIA LAB PRIVATE LIMITED",CIN:"U74999KA2018PTC114001",
+        CompanyStatus:"Active",CompanyClass:"Private",CompanyCategory:"Company limited by shares",
+        CompanySubCategory:"Non-government company",DateOfRegistration:"2018-01-12",
+        RegisteredState:"Karnataka",RegistrarOfCompanies:"ROC Bangalore"
+      }]:[];
+      return new Response(JSON.stringify({total:records.length,records}),{status:200,headers:{"content-type":"application/json"}});
+    }
+    if(url.hostname==="api.tavily.com"){
+      const query=JSON.parse(init.body||"{}").query||"";
+      tavilyQueries.push(query);
+      let result;
+      if(query.includes("site:linkedin.com/company")) result={title:"Afthonia Lab Pvt Ltd | LinkedIn",url:"https://www.linkedin.com/company/afthonia-lab/",content:"Public LinkedIn company page for the Bengaluru fintech incubator."};
+      else if(query.includes("founders history partnerships")) result={title:"Afthonia Lab company profile",url:"https://inc42.com/buzz/afthonia-lab-profile/",content:"Independent company-history and startup ecosystem coverage."};
+      else if(query.includes("internship jobs hiring")) result={title:"Afthonia Lab internship opportunities",url:"https://internshala.com/company/afthonia-lab/",content:"Public hiring and internship listing reference."};
+      else if(query.includes("official website")) result={title:"Afthonia Lab official website",url:"https://www.afthonialab.com/about",content:"Official website result referencing company programmes and team."};
+      else result={title:"Public profile reference",url:"https://www.linkedin.com/in/afthonia-operations/",content:"Public professional profile search reference."};
+      return new Response(JSON.stringify({results:[{...result,score:0.9,published_date:"2026-10-01"}],usage:{credits:1}}),{status:200,headers:{"content-type":"application/json"}});
+    }
+    if(url.hostname==="www.wikidata.org") return new Response(JSON.stringify({search:[]}),{status:200,headers:{"content-type":"application/json"}});
+    return new Response(JSON.stringify({}),{status:200,headers:{"content-type":"application/json"}});
+  };
+  let response;
+  try{
+    response=await worker.fetch(
+      new Request("https://api.example.workers.dev/v1/investigate",{method:"POST",body:form}),
+      env({AI:ai,DATA_GOV_API_KEY:"test-data-gov-key",TAVILY_API_KEY:"test-tavily-key"}),ctx
+    );
+  }finally{globalThis.fetch=originalFetch;}
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.documentReview.documentType,"internship_certificate");
+  assert.equal(body.documentReview.pastExperienceDocument,true);
+  assert.equal(body.verdict,"insufficient_evidence");
+  assert.equal(body.riskLevel,"unknown");
+  assert.match(body.headline,/completed-internship certificate/i);
+  assert.equal(body.recruiterEmailEvidence.mailboxType,"role_based_business_mailbox");
+  assert.equal(body.recruiterEmailEvidence.websiteDomainMatch,"matches_student_supplied_website");
+  assert.ok(body.company.mcaMatches.some(x=>x.name==="AFTHONIA LAB PRIVATE LIMITED"));
+  assert.ok(requestedMcaNames.includes("AFTHONIA LAB PVT LTD"));
+  assert.ok(requestedMcaNames.includes("AFTHONIA LAB"));
+  assert.equal(body.digitalFootprint.configured,true);
+  assert.equal(body.digitalFootprint.signals.linkedinCompanyPagesFound,1);
+  assert.ok(body.digitalFootprint.sources.some(x=>x.host==="inc42.com"));
+  assert.ok(tavilyQueries.length>=4);
+  assert.match(modelInput,/digitalFootprint/);
+  assert.doesNotMatch(body.redFlags.join(" "),/No MCA|generic email|No stipend|No official contact/i);
+});
+
+test("Tavily web search is disabled cleanly when no secret is configured",async()=>{
+  const ai={
+    async toMarkdown(){return[];},
+    async run(){return {response:{
+      verdict:"insufficient_evidence",riskLevel:"unknown",headline:"More evidence needed",summary:"No public search configured.",
+      claimedCompany:"Example Startup",documentType:"unclear",documentFacts:[],
+      role:"",stipend:"",duration:"",workModeAndLocation:"",
+      explicitRecruitmentStages:[],companyStagesConfirmed:false,typicalPossibleStages:[],stageNote:"",
+      redFlags:[],consistencySignals:[],missingInformation:[],questionsToAsk:[],nextSteps:[]
+    }}}
+  };
+  const form=new FormData();form.set("companyName","Example Startup");form.set("website","https://example.com");
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async input=>{
+    const url=new URL(input);
+    if(url.hostname==="dns.google")return new Response(JSON.stringify({Status:0,Answer:[]}),{status:200,headers:{"content-type":"application/json"}});
+    if(url.hostname==="rdap.org")return new Response("{}",{status:200,headers:{"content-type":"application/json"}});
+    if(url.hostname==="www.wikidata.org")return new Response(JSON.stringify({search:[]}),{status:200,headers:{"content-type":"application/json"}});
+    if(url.hostname==="www.data.gov.in")return new Response(JSON.stringify({records:[],total:0}),{status:200,headers:{"content-type":"application/json"}});
+    throw new Error("Tavily must not be called without a configured API key.");
+  };
+  let response;
+  try{
+    response=await worker.fetch(new Request("https://api.example.workers.dev/v1/investigate",{method:"POST",body:form}),env({AI:ai,DATA_GOV_API_KEY:"test"}),ctx);
+  }finally{globalThis.fetch=originalFetch;}
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.digitalFootprint.configured,false);
+  assert.equal(body.digitalFootprint.presence,"not_searched");
+});
