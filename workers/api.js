@@ -314,6 +314,10 @@ async function searchR2CompanyIndex(env, query, limit = 12) {
         .map(([,row]) => ({
           identifier:row.i, name:row.n, status:row.s, state:row.t,
           registrationDate:row.d, class:row.c, roc:row.r,
+          category:row.g, subCategory:row.u,
+          authorizedCapital:row.a, paidUpCapital:row.p,
+          registeredOffice:row.o, listingStatus:row.l,
+          industrialClassification:row.x,
           source:"MCA Company Master Data (R2 token index)",
           sourceUrl:"https://www.data.gov.in/catalog/company-master-data",
           matchScore:String(row.k || "").startsWith(queryNorm) ? 1 : tokens.length > 1 ? 0.96 : 0.9
