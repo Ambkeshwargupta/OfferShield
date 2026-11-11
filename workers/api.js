@@ -674,6 +674,13 @@ async function communitySubmissionRateLimit(request, env) {
   const row = await env.DB.prepare("SELECT count FROM rate_limits WHERE key=? AND bucket=?").bind(key,bucket).first();
   return (row?.count || 0) <= 3;
 }
+async function communitySchemaConfigured(env) {
+  if (!env.DB) return false;
+  try {
+    const row = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='community_reports'").first();
+    return !!row;
+  } catch { return false; }
+}
 async function getCommunityRecruitmentInsights(env, companyName, websiteOrDomain) {
   const companyKey = communityCompanyKey(companyName);
   const domain = normalizeDomain(websiteOrDomain);
@@ -1120,7 +1127,10 @@ async function route(request, env) {
   if (origin === null) return jsonError("Origin not allowed.", 403, "null", "origin_not_allowed");
   if (request.method === "OPTIONS") return new Response(null, { status:204, headers:{"access-control-allow-origin":origin,"access-control-allow-methods":"GET,POST,DELETE,OPTIONS","access-control-allow-headers":"content-type","access-control-max-age":"86400","vary":"Origin"} });
   const url = new URL(request.url);
-  if (url.pathname === "/health" || url.pathname === "/v1/health") return response({ ok:true, service:"OfferShield Intelligence API", version:"1.2.0", officialOgdConfigured:!!env.DATA_GOV_API_KEY, d1Configured:!!env.DB, communityIntelligenceConfigured:!!env.DB, companyIndexConfigured:!!env.COMPANY_INDEX, aiConfigured:!!env.AI, documentConversionConfigured:!!(env.AI && typeof env.AI.toMarkdown === "function"), checkedAt:new Date().toISOString() },200,origin);
+  if (url.pathname === "/health" || url.pathname === "/v1/health") {
+    const communityReady = await communitySchemaConfigured(env);
+    return response({ ok:true, service:"OfferShield Intelligence API", version:"1.2.1", officialOgdConfigured:!!env.DATA_GOV_API_KEY, d1Configured:!!env.DB, communityIntelligenceConfigured:communityReady, companyIndexConfigured:!!env.COMPANY_INDEX, aiConfigured:!!env.AI, documentConversionConfigured:!!(env.AI && typeof env.AI.toMarkdown === "function"), checkedAt:new Date().toISOString() },200,origin);
+  }
   if (!url.pathname.startsWith("/v1/")) return jsonError("Route not found.",404,origin,"not_found");
   if (!await rateLimit(request,env)) return jsonError("Rate limit reached. Please retry in one minute.",429,origin,"rate_limited");
   if (request.method === "POST" && url.pathname === "/v1/investigate") {
