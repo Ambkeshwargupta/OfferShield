@@ -170,6 +170,9 @@ async function main() {
   while (downloaded < maxRecords && (!total || offset < total)) {
     const requested = Math.min(pageSize, Number.isFinite(maxRecords) ? maxRecords - downloaded : pageSize);
     const page = await fetchPage(offset, requested, apiKey);
+    if (total && page.total && page.total !== total) {
+      throw new Error("The reported MCA dataset total changed during this resumed import. Refusing to combine pages from different source snapshots; preserve the existing published index and start a fresh ingestion checkpoint.");
+    }
     if (!total && page.total) total = page.total;
     if (!sourceUpdatedAt && page.updatedAt) sourceUpdatedAt = page.updatedAt;
     if (page.records.length === 0) break;
