@@ -495,7 +495,15 @@ async function route(request, env) {
     const query = cleanText(url.searchParams.get("q"),120).trim();
     if (query.length < 2) return jsonError("Enter at least two characters.",400,origin);
     const r2Indexed = await searchR2CompanyIndex(env, query, 12);
-    const indexed = r2Indexed.available ? r2Indexed : await searchNationalCompanyIndex(env, query, 12);
+    const d1Indexed = (r2Indexed.records || []).length ? { configured:false, available:false, records:[], strategy:"r2_results_preferred" } : await searchNationalCompanyIndex(env, query, 12);
+    const indexed = (r2Indexed.records || []).length
+      ? r2Indexed
+      : {
+          ...d1Indexed,
+          configured:!!(r2Indexed.configured || d1Indexed.configured),
+          available:!!(r2Indexed.available || d1Indexed.available),
+          message:d1Indexed.message || r2Indexed.message || null
+        };
     const result = await resolveSearch(query,env);
     if (indexed.records.length) {
       const merged = new Map();
