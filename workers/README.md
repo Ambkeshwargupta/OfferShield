@@ -108,21 +108,24 @@ In Cloudflare R2, create an S3 API token with **Object Read & Write** access sco
 
 Find your Cloudflare Account ID in the Cloudflare dashboard.
 
-#### 3. Add three GitHub Actions secrets
+#### 3. Add four GitHub Actions secrets
 
 Open the repository's [Actions secrets](https://github.com/Ambkeshwargupta/OfferShield/settings/secrets/actions) page and add:
 
 | Secret name | Value |
 |---|---|
 | `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with permission to deploy Workers and access the R2 binding |
 | `R2_ACCESS_KEY_ID` | R2 S3 Access Key ID |
 | `R2_SECRET_ACCESS_KEY` | R2 S3 Secret Access Key |
 
-The existing `DATA_GOV_API_KEY` repository secret is reused. No key is written to the repository, downloaded dataset, index manifest or workflow output.
+The existing `DATA_GOV_API_KEY` repository secret is reused. No key is written to the repository, downloaded dataset, index manifest or workflow output. The Cloudflare API token is used only by the separate Worker deployment workflow; the R2 S3 credentials are used only to upload objects.
 
 #### 4. Deploy the Worker with the R2 binding
 
-The `workers/wrangler.toml` file now includes the `COMPANY_INDEX` R2 binding. After the bucket exists, from the repository's `workers` directory run:
+The `workers/wrangler.toml` file now includes the `COMPANY_INDEX` R2 binding. After the bucket exists and the four secrets above are added, open **GitHub → Actions → Deploy OfferShield intelligence Worker → Run workflow**. That workflow stores `DATA_GOV_API_KEY` as a Worker secret and deploys the Worker using the R2 binding.
+
+Alternatively, from the repository's `workers` directory run:
 
 ```bash
 npx wrangler login
