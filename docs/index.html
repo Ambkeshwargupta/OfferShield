@@ -441,12 +441,13 @@ function openManualCompanyFromSearch(query){const c=createManualCompany(query);s
 
 
 // Advanced company intelligence: Worker API when connected, browser-safe fallbacks otherwise.
-function workerApiBase(){return (localStorage.getItem("offershield_worker_api")||"").replace(/\/+$/,"")}
+const DEFAULT_WORKER_API="https://offershield-intelligence.official-ambkeshwargupta.workers.dev";
+function workerApiBase(){return (localStorage.getItem("offershield_worker_api")||DEFAULT_WORKER_API).replace(/\/+$/,"")}
 function refreshWorkerStatus(){
  const base=workerApiBase();$("#workerApiUrl").value=base;
  $("#workerStatus").textContent=base?"Worker API configured":"Browser fallback";
  $("#workerStatus").className="tag "+(base?"official":"demo");
- $("#workerApiHint").textContent=base?"The site will use your configured Cloudflare Worker. The Worker URL contains no secret. Test the connection before relying on live registry queries.":"No Worker is connected. Wikidata discovery and browser DNS checks remain available; official OGD lookup requires a server-side data.gov.in key.";
+ $("#workerApiHint").textContent=base?"OfferShield uses its deployed Cloudflare Worker. The endpoint is public and contains no secret. Test the connection to confirm Workers AI, document conversion and D1 status.":"No Worker is connected. Wikidata discovery and browser DNS checks remain available; official OGD lookup requires a server-side data.gov.in key.";
 }
 async function workerRequest(path,options={}){
  const base=workerApiBase();if(!base)throw new Error("Connect your Cloudflare Worker URL first.");
