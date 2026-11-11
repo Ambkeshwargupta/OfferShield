@@ -37,7 +37,15 @@ async function cloudflareApi(path, options = {}) {
   return data;
 }
 
-const endpoint = "/accounts/" + accountId.trim() + "/d1/database";
+// Validate the token independently from D1 permissions. This separates
+// invalid/expired/account-mismatched tokens from a D1-specific permission failure.
+const tokenCheck = await cloudflareApi("/accounts/" + accountId + "/tokens/verify");
+if (tokenCheck.result?.status !== "active") {
+  throw new Error("Cloudflare token verification did not return active status. Check the GitHub CLOUDFLARE_API_TOKEN value and account scope.");
+}
+console.log("Cloudflare token verification: active for the configured account.");
+
+const endpoint = "/accounts/" + accountId + "/d1/database";
 let database;
 try {
   console.log("Creating or provisioning the D1 database in APAC: " + databaseName);
