@@ -66,8 +66,6 @@ if (!database) {
     ].join("\n");
     config = config.replace(/\s*# Create a D1 database[\s\S]*?(?=\n# Store DATA_GOV_API_KEY)/, "");
     config = config.replace(/\s*$/, "") + block;
-  } else if (!activeBlock.test(config)) {
-    throw new Error("A D1 DB binding exists but could not be parsed. Review workers/wrangler.toml manually.");
   }
 }
 
