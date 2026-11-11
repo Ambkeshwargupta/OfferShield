@@ -235,3 +235,44 @@ test("company name search uses the R2 national MCA token index",async()=>{
     globalThis.fetch=originalFetch;
   }
 });
+
+test("company name search uses the R2 token manifest and scans the rarest token",async()=>{
+  const row={i:"U12345MH2020PTC123456",n:"EXAMPLE INDUSTRIES PRIVATE LIMITED",k:"example industries private limited",s:"Active",t:"Maharashtra",d:"2020-04-01",c:"Private",r:"RoC Mumbai"};
+  const manifests={
+    example:{version:2,token:"example",recordCount:1,shardCount:1,shards:["mca/term/example/part-00001.ndjson.gz"]},
+    industries:{version:2,token:"industries",recordCount:80,shardCount:1,shards:["mca/term/industries/part-00001.ndjson.gz"]}
+  };
+  const requested=[];
+  const bucket={
+    async get(key) {
+      requested.push(key);
+      const manifestToken=key.match(/^index\/mca\/term\/([^/]+)\/manifest\.json$/)?.[1];
+      if(manifestToken) return {text:async()=>JSON.stringify(manifests[manifestToken]||null)};
+      if(key==="index/mca/term/example/part-00001.ndjson.gz") {
+        return {body:new Response(gzipSync(JSON.stringify(row)+"\n")).body};
+      }
+      return null;
+    },
+    async list() { return {objects:[],delimitedPrefixes:[],truncated:false}; }
+  };
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({search:[]}),{status:200,headers:{"content-type":"application/json"}});
+  try {
+    const response=await worker.fetch(
+      new Request("https://api.example.workers.dev/v1/search?q=Example%20Industries"),
+      env({COMPANY_INDEX:bucket}),ctx
+    );
+    const body=await response.json();
+    assert.equal(response.status,200);
+    assert.equal(body.nationalIndex.strategy,"r2_token_manifest_postings");
+    assert.equal(body.nationalIndex.indexedMatches,1);
+    assert.equal(body.registry[0].name,row.n);
+    assert.equal(body.registry[0].identifier,row.i);
+    assert.equal(body.nationalIndex.partial,false);
+    assert.equal(requested.includes("index/mca/term/example/part-00001.ndjson.gz"),true);
+    assert.equal(body.registry[0].evidenceStatus,"official_dataset_record");
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
+});
+
