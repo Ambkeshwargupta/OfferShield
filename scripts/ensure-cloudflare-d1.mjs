@@ -1,12 +1,33 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 
 const databaseName = "offershield-intelligence";
 const configPath = "workers/wrangler.toml";
-const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+const configuredAccountId = (process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
 const token = process.env.CLOUDFLARE_API_TOKEN;
 
-if (!accountId || !token) throw new Error("CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required.");
-if (!/^[a-f0-9]{32}$/i.test(accountId.trim())) throw new Error("CLOUDFLARE_ACCOUNT_ID must be the 32-character Account ID shown in Cloudflare Account Details.");
+if (!token) throw new Error("CLOUDFLARE_API_TOKEN is required.");
+
+// Derive the account identifier from the authenticated token, so a copied
+// account name or zone ID in the optional GitHub secret cannot misroute D1 calls.
+let whoami;
+try {
+  whoami = execFileSync("wrangler", ["whoami"], {
+    encoding: "utf8",
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+} catch {
+  throw new Error("Could not identify the Cloudflare account from the deployment token. Check CLOUDFLARE_API_TOKEN permissions.");
+}
+const accountIds = [...new Set([...whoami.matchAll(/\\|[^|]+\\|\\s*([a-f0-9]{32})\\s*\\|/gi)].map(match => match[1].toLowerCase()))];
+if (accountIds.length !== 1) {
+  throw new Error("Could not uniquely read the 32-character Account ID from wrangler whoami.");
+}
+const accountId = accountIds[0];
+if (configuredAccountId && configuredAccountId !== accountId) {
+  console.log("The CLOUDFLARE_ACCOUNT_ID secret did not match the authenticated account; using the account ID returned by Wrangler.");
+}
 
 async function cloudflareApi(path, options = {}) {
   const response = await fetch("https://api.cloudflare.com/client/v4" + path, {
