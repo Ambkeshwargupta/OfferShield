@@ -41,6 +41,13 @@ test("public digital footprint report displays indexed LinkedIn, history, jobs a
   assert.match(html, /recruiterEmailEvidence/);
 });
 
+test("investigation results show three plain-language evidence layers", () => {
+  assert.match(html, /At a glance · three separate checks/);
+  assert.match(html, /Government identity/);
+  assert.match(html, /Digital footprint/);
+  assert.match(html, /Submitted evidence/);
+});
+
 test("public footprint section separates ecosystem partner signals from company history", () => {
   assert.match(html, /Partners and ecosystem network/);
   assert.match(html, /ecosystemNetworkResults/);
