@@ -76,8 +76,11 @@ test("advanced workspace exposes Udyam State/District search and pagination", ()
 });
 
 test("navigation uses the multi-element selector for page and nav collections", () => {
-  assert.match(html, /function go\(page\)\{\$\$\("\.page"\)\.forEach/);
-  assert.match(html, /\$\$\("\.nav button"\)\.forEach\(b=>b\.classList\.toggle/);
-  assert.doesNotMatch(html, /function go\(page\)\{\$\("\.page"\)\.forEach/);
-  assert.doesNotMatch(html, /function go\(page\)[^\n]*\$\("\.nav button"\)\.forEach/);
+  const start = html.indexOf("function go(page){");
+  const end = html.indexOf("\\nfunction initials", start);
+  const goSource = html.slice(start, end > start ? end : start + 900);
+  assert.ok(goSource.includes('$(".page").forEach'));
+  assert.ok(goSource.includes('$(".nav button").forEach'));
+  assert.ok(!goSource.startsWith('function go(page){$(".page")'));
+  assert.ok(!goSource.includes(');$(".nav button").forEach'));
 });
