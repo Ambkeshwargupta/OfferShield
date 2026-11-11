@@ -20,3 +20,8 @@ ALLOWED_ORIGINS = "https://ambkeshwargupta.github.io,http://localhost:3000,http:
 
 [triggers]
 crons = ["15 3 * * *"]
+
+# National MCA token index stored as compact gzip shards in R2.
+[[r2_buckets]]
+binding = "COMPANY_INDEX"
+bucket_name = "offershield-company-index"
