@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   deploy:
@@ -38,6 +38,27 @@ jobs:
           echo "All required deployment secrets are present (values are not printed)."
       - name: Install Wrangler
         run: npm install --global wrangler@latest
+      - name: Provision or reuse the Community Intelligence D1 database
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ensure-cloudflare-d1.mjs
+      - name: Apply OfferShield D1 schema
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: wrangler d1 execute offershield-intelligence --remote --file=workers/schema.sql --yes --config workers/wrangler.toml
+      - name: Save the D1 binding in the repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- workers/wrangler.toml; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add workers/wrangler.toml
+            git commit -m "Configure Cloudflare D1 binding for OfferShield"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
       - name: Verify Cloudflare authentication
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -57,3 +78,27 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
         run: printf '%s' "$DATA_GOV_API_KEY" | wrangler secret put DATA_GOV_API_KEY --config workers/wrangler.toml
+      - name: Verify live Worker, AI and Community Intelligence
+        shell: bash
+        env:
+          WORKER_URL: https://offershield-intelligence.official-ambkeshwargupta.workers.dev
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            const url = process.env.WORKER_URL + "/v1/health";
+            const response = await fetch(url);
+            const data = await response.json();
+            console.log(JSON.stringify({
+              status:response.status,
+              service:data.service,
+              version:data.version,
+              aiConfigured:data.aiConfigured,
+              documentConversionConfigured:data.documentConversionConfigured,
+              d1Configured:data.d1Configured,
+              communityIntelligenceConfigured:data.communityIntelligenceConfigured,
+              companyIndexConfigured:data.companyIndexConfigured
+            }, null, 2));
+            if (!response.ok || !data.ok || !data.aiConfigured || !data.documentConversionConfigured || !data.d1Configured || !data.communityIntelligenceConfigured) {
+              throw new Error("Worker is deployed but one or more required bindings/schema checks are not ready.");
+            }
+          '
