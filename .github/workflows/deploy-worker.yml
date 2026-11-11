@@ -59,7 +59,7 @@ jobs:
       - name: Apply OfferShield D1 schema
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Account ID is exported by ensure-cloudflare-d1.mjs from the verified dashboard account.
         run: wrangler d1 execute offershield-intelligence --remote --file=workers/schema.sql --yes --config workers/wrangler.toml
       - name: Save the D1 binding in the repository
         shell: bash
@@ -75,7 +75,7 @@ jobs:
       - name: Verify Cloudflare authentication
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Account ID is exported by ensure-cloudflare-d1.mjs from the verified dashboard account.
         run: wrangler whoami
       - name: Confirm R2 bucket prerequisite
         run: |
@@ -83,12 +83,12 @@ jobs:
       - name: Deploy Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Account ID is exported by ensure-cloudflare-d1.mjs from the verified dashboard account.
         run: wrangler deploy --config workers/wrangler.toml
       - name: Set MCA API key as Worker secret
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Account ID is exported by ensure-cloudflare-d1.mjs from the verified dashboard account.
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
         run: printf '%s' "$DATA_GOV_API_KEY" | wrangler secret put DATA_GOV_API_KEY --config workers/wrangler.toml
       - name: Verify live Worker, AI and Community Intelligence
