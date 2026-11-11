@@ -64,3 +64,13 @@ test("advanced search recognises email and URL domain inputs without a Worker", 
   assert.match(html, /domainCandidate=query\.includes\("@"\)/);
   assert.match(html, /query\.replace\(\/\^https\?/);
 });
+
+test("advanced workspace exposes Udyam State/District search and pagination", () => {
+  assert.match(html, /id="udyamState"/);
+  assert.match(html, /id="udyamDistrict"/);
+  assert.match(html, /id="udyamTextQuery"/);
+  assert.match(html, /\/v1\/udyam\/search/);
+  assert.match(html, /filters\\[State\\]/);
+  assert.match(html, /Udyam Registration Number/);
+  assert.match(html, /udyamNextPage/);
+});
