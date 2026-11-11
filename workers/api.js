@@ -628,6 +628,8 @@ async function analyseInternshipUpload(request, env, origin) {
   const recruiterName = cleanText(form.get("recruiterName"),120).trim();
   const recruiterEmail = cleanText(form.get("recruiterEmail"),180).trim();
   const jobSourceUrl = cleanText(form.get("jobSourceUrl"),500).trim();
+  const companyState = cleanText(form.get("state"),100).trim();
+  const companyDistrict = cleanText(form.get("district"),100).trim();
   const messageText = cleanText(form.get("messageText"),30000).trim();
   const notes = cleanText(form.get("attachmentsText"),12000).trim();
   const files = form.getAll("files").filter(file => file && typeof file.arrayBuffer === "function" && file.size > 0);
@@ -688,7 +690,7 @@ async function analyseInternshipUpload(request, env, origin) {
     normalizeDomain(jobSourceUrl),
     ...emailMatches.map(x=>normalizeDomain(x)),
     ...urls.map(x=>normalizeDomain(x))
-  ].filter(Boolean))].slice(0,2);
+  ].filter(Boolean))].slice(0,1);
 
   const domainChecks = await Promise.all(domains.map(domain=>domainIntelligence(domain)));
   let mcaRecords = [];
@@ -737,10 +739,51 @@ async function analyseInternshipUpload(request, env, origin) {
     "Identify payment requests, deposits, unrealistic stipends, pressure tactics, unusual links, generic email services, vague responsibilities and missing written terms. Context matters; one signal alone is not proof of fraud.",
     "Use only the supplied MCA and domain data. Do not claim you browsed websites, LinkedIn, reviews or job boards. Keep advice practical and student-friendly."
   ].join(" ");
+  let udyamRecords = [];
+  let udyamSearch = { available:false, pagesChecked:0, note:"Add both State and District to check the Udyam registered-units dataset." };
+  if (companyState && companyDistrict && env.DATA_GOV_API_KEY) {
+    const offsets = [0,100,200];
+    const checked = [];
+    for (const offset of offsets) {
+      const page = await udyamLookup(env,companyState,companyDistrict,companyName,100,offset);
+      if (page.error) {
+        udyamSearch = {available:false,pagesChecked:checked.length,error:page.error,note:"Udyam lookup could not be completed."};
+        break;
+      }
+      checked.push(offset);
+      if ((page.records || []).length) {
+        udyamRecords = page.records.slice(0,10).map(row=>({
+          enterpriseName:row.enterpriseName,
+          activities:row.activities,
+          state:row.state,
+          district:row.district,
+          pincode:row.pincode,
+          registrationDate:row.registrationDate,
+          communicationAddress:row.communicationAddress,
+          evidenceStatus:"official_dataset_record",
+          sourceUrl:UDYAM_SOURCE_URL
+        }));
+        break;
+      }
+    }
+    udyamSearch = {
+      available:true,
+      pagesChecked:checked.length,
+      offsetsChecked:checked,
+      matchedRecords:udyamRecords.length,
+      note:udyamRecords.length
+        ? "Name matches were found on the searched Udyam result page(s); they are enterprise-list candidates, not exact Udyam certificate verification."
+        : "No name match appeared in the first searched pages for this State and District. This does not prove that the enterprise is unregistered."
+    };
+  } else if (companyState || companyDistrict) {
+    udyamSearch = {available:false,pagesChecked:0,note:"Both State and District plus a configured data.gov.in key are required for this Udyam dataset."};
+  }
+  const publicDiscovery = companyName ? await wikidataSearch(companyName) : [];
+
   const user = JSON.stringify({
-    companyName,website,role,recruiterName,recruiterEmail,jobSourceUrl,evidence,
+    companyName,website,role,recruiterName,recruiterEmail,jobSourceUrl,companyState,companyDistrict,evidence,
     extractedEmails:emailMatches,extractedUrls:urls,
-    paymentLanguage:paymentLines,mcaRecords,mcaSearch,
+    paymentLanguage:paymentLines,mcaRecords,mcaSearch,udyamRecords,udyamSearch,publicDiscovery,
     domainChecks:domainChecks.map(x=>({
       domain:x.domain,emailSecurity:x.emailSecurity,
       registration:x.registration ? {ldhName:x.registration.ldhName,status:x.registration.status,events:x.registration.events,registrar:x.registration.registrar} : null
@@ -775,6 +818,7 @@ async function analyseInternshipUpload(request, env, origin) {
     searchLinks.push(
       {label:"Search official website",url:"https://www.google.com/search?q="+q+"+official+website",kind:"discovery"},
       {label:"Search internship selection stages",url:"https://www.google.com/search?q="+q+"+internship+selection+process",kind:"discovery"},
+      {label:"Search company reviews and employee experiences",url:"https://www.google.com/search?q="+q+"+reviews+employee+experience",kind:"discovery"},
       {label:"LinkedIn company search",url:"https://www.linkedin.com/search/results/companies/?keywords="+q,kind:"discovery"},
       {label:"LinkedIn internship vacancies",url:"https://www.linkedin.com/jobs/search/?keywords="+job,kind:"discovery"},
       {label:"Indeed India vacancies",url:"https://in.indeed.com/jobs?q="+job,kind:"discovery"},
@@ -801,7 +845,7 @@ async function analyseInternshipUpload(request, env, origin) {
     verdict:["high_risk","caution","mixed","insufficient_evidence"].includes(analysis.verdict) ? analysis.verdict : "insufficient_evidence",
     riskLevel:["high","elevated","moderate","unknown"].includes(analysis.riskLevel) ? analysis.riskLevel : "unknown",
     headline:cleanText(analysis.headline,160),summary:cleanText(analysis.summary,1400),
-    company:{claimedName:company,mcaMatches:mcaRecords,mcaSearch},
+    company:{claimedName:company,mcaMatches:mcaRecords,mcaSearch,udyamMatches:udyamRecords,udyamSearch,publicDiscovery},
     offer:{role:roleName,stipend:cleanText(analysis.stipend,120),duration:cleanText(analysis.duration,120),workModeAndLocation:cleanText(analysis.workModeAndLocation,180)},
     recruitmentStages:{
       explicitStages:Array.isArray(analysis.explicitRecruitmentStages)?analysis.explicitRecruitmentStages.slice(0,10):[],
