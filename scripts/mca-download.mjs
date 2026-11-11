@@ -14,7 +14,7 @@ import { once } from "node:events";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const RESOURCE_ID = process.env.DATA_GOV_RESOURCE_ID || "4dbe5667-7b6b-41d7-82af-211562424d9a";
-const API_BASE = "https://api.data.gov.in/resource/";
+const API_BASE = process.env.DATA_GOV_API_BASE_URL || "https://www.data.gov.in/backend/dataapi/v1/resource/";
 const DEFAULT_OUTPUT = ".data/mca/company-master.ndjson";
 const DEFAULT_CHECKPOINT = ".data/mca/checkpoint.json";
 
