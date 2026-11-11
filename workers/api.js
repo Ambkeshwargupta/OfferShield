@@ -669,8 +669,14 @@ async function analyseInternshipUpload(request, env, origin) {
     extracted ? "EXTRACTED UPLOAD CONTENT:\n" + extracted : ""
   ].filter(Boolean).join("\n\n").slice(0,48000);
 
-  const emailMatches = [...new Set(evidence.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [])].map(x=>x.toLowerCase());
-  const urls = [...new Set((evidence.match(/\bhttps?:\/\/[^\s<>"'()]+/gi) || []).map(x=>x.replace(/[.,;:!?]+$/,"")))];
+  const emailMatches = [...new Set([
+    ...(evidence.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []),
+    ...(recruiterEmail ? [recruiterEmail] : [])
+  ])].map(x=>x.toLowerCase());
+  const urls = [...new Set([
+    ...(evidence.match(/\bhttps?:\/\/[^\s<>"'()]+/gi) || []).map(x=>x.replace(/[.,;:!?]+$/,"")),
+    ...(jobSourceUrl ? [jobSourceUrl] : [])
+  ])];
   const paymentLines = evidence.split(/[.!?\n]+/).map(x=>x.trim()).filter(x =>
     !/(no|without|never|not)\s+(any\s+)?(registration|processing|training|security|verification)\s*(fee|charge|deposit)/i.test(x) &&
     /(registration\s+fee|processing\s+fee|training\s+fee|security\s+deposit|verification\s+fee|refundable\s+deposit|pay.{0,40}(₹|rs\.?|inr|upi)|transfer.{0,40}(₹|rs\.?|inr|upi))/i.test(x)
@@ -799,7 +805,8 @@ async function analyseInternshipUpload(request, env, origin) {
     offer:{role:roleName,stipend:cleanText(analysis.stipend,120),duration:cleanText(analysis.duration,120),workModeAndLocation:cleanText(analysis.workModeAndLocation,180)},
     recruitmentStages:{
       explicitStages:Array.isArray(analysis.explicitRecruitmentStages)?analysis.explicitRecruitmentStages.slice(0,10):[],
-      companyStagesConfirmed:analysis.companyStagesConfirmed===true,
+      stagesFoundInProvidedEvidence:Array.isArray(analysis.explicitRecruitmentStages) && analysis.explicitRecruitmentStages.length > 0,
+      companyStagesConfirmed:false,
       typicalPossibleStages:Array.isArray(analysis.typicalPossibleStages)?analysis.typicalPossibleStages.slice(0,7):[],
       note:cleanText(analysis.stageNote,900)
     },
