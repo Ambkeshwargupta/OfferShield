@@ -945,7 +945,8 @@ async function analyseInternshipUpload(request, env, origin) {
   const jobSourceUrl = cleanText(form.get("jobSourceUrl"),500).trim();
   const companyState = cleanText(form.get("state"),100).trim();
   const companyDistrict = cleanText(form.get("district"),100).trim();
-  const reviewPurpose = cleanText(form.get("reviewPurpose"),40).trim() || "auto";
+  const requestedReviewPurpose = cleanText(form.get("reviewPurpose"),40).trim();
+  const reviewPurpose = ["auto","new_offer","past_internship","certificate_review","company_background"].includes(requestedReviewPurpose)?requestedReviewPurpose:"auto";
   const messageText = cleanText(form.get("messageText"),30000).trim();
   const notes = cleanText(form.get("attachmentsText"),12000).trim();
   const files = form.getAll("files").filter(file => file && typeof file.arrayBuffer === "function" && file.size > 0);
@@ -1212,7 +1213,7 @@ async function analyseInternshipUpload(request, env, origin) {
 
   let flags = Array.isArray(analysis.redFlags) ? analysis.redFlags.slice(0,10) : [];
   // Dataset coverage gaps are never themselves evidence of fraud.
-  flags = flags.filter(flag=>!/(no|not found|missing|unavailable).{0,35}(mca|udyam|official contact|community intelligence)|(?:mca|udyam|official contacts|community intelligence).{0,35}(no match|not found|missing|unavailable)/i.test(String(flag)));
+  flags = flags.filter(flag=>!/(no|not found|missing|unavailable|not listed|not returned|no matching).{0,60}(mca|udyam|official contact|community intelligence)|(?:mca|udyam|official contacts|community intelligence).{0,60}(no match|not found|missing|unavailable|not listed|not returned)/i.test(String(flag)));
   const consistencySignals = Array.isArray(analysis.consistencySignals)?analysis.consistencySignals.slice(0,8):[];
   if (recruiterEmailEvidence.websiteDomainMatch==="matches_student_supplied_website") {
     flags = flags.filter(flag=>!/(generic email service|free email provider|generic email address)/i.test(String(flag)));
@@ -1235,8 +1236,9 @@ async function analyseInternshipUpload(request, env, origin) {
     finalSummary = "OfferShield has switched this review to past-experience document review. Missing offer terms, stipend details or recruitment stages are not fraud signals for a completion certificate. Review the issuer, student name, role, dates and signatory against independent company sources.";
   } else if (finalVerdict==="high_risk" && !seriousRiskSignal) {
     finalVerdict = "caution";
-    finalRiskLevel = finalRiskLevel==="unknown"?"moderate":"moderate";
-    finalHeadline = "No strong fraud indicator was established; verify the remaining gaps before relying on this offer.";
+    finalRiskLevel = "moderate";
+    finalHeadline = "No strong fraud indicator was established; verify the remaining details before relying on this offer.";
+    finalSummary = "The submitted material does not establish a concrete fraud indicator. The remaining issues are missing or unconfirmed details, not proof that the company or offer is fake. Confirm the written role, stipend, duration and recruiter authority through contact details independently published by the company.";
   }
 
   const searchLinks = [];
