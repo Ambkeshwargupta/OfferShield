@@ -89,7 +89,7 @@ The API now queries a local D1 full-text index before using the existing exact O
 From the repository root:
 
 ```bash
-npx wrangler d1 execute offershield-intelligence --remote --file=workers/migrations/0002_national_company_index.sql
+npx wrangler --config workers/wrangler.toml d1 execute offershield-intelligence --remote --file=workers/migrations/0002_national_company_index.sql
 ```
 
 For a brand-new database, `workers/schema.sql` also includes these tables and FTS5 triggers.
