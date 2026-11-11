@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       max_records:
-        description: "Optional record cap for a test run; use 0 for the complete dataset"
+        description: "Use 1000 for a staging test; use 0 to resume and publish the complete MCA snapshot"
         required: true
         default: "0"
         type: string
@@ -21,10 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
-      DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      DATA_GOV_API_KEY: \${{ secrets.DATA_GOV_API_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: \${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: \${{ secrets.R2_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto
       R2_BUCKET_NAME: offershield-company-index
     steps:
@@ -32,37 +32,151 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Validate required secrets and R2 bucket access
+
+      - name: Validate credentials and dedicated R2 bucket
         shell: bash
         run: |
           set -euo pipefail
           for name in DATA_GOV_API_KEY CLOUDFLARE_ACCOUNT_ID AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
-            if [ -z "${!name:-}" ]; then echo "Missing required GitHub Actions secret: $name"; exit 1; fi
+            if [ -z "$(printenv "$name" || true)" ]; then
+              echo "Missing required GitHub Actions secret: $name"
+              exit 1
+            fi
           done
           if ! command -v aws >/dev/null 2>&1; then
             sudo apt-get update
             sudo apt-get install -y awscli
           fi
           aws --version
-          aws s3api head-bucket --bucket "$R2_BUCKET_NAME" --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com"
-      - name: Download official MCA company master data
+          aws s3api head-bucket \
+            --bucket "$R2_BUCKET_NAME" \
+            --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com"
+          echo "R2 bucket is reachable. Raw ingestion and published index use separate prefixes."
+
+      - name: Restore persistent MCA checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .data/mca/pages
+          if aws s3 ls "s3://$R2_BUCKET_NAME/ingestion/mca/checkpoint.json" \
+            --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com" >/dev/null 2>&1; then
+            aws s3 cp "s3://$R2_BUCKET_NAME/ingestion/mca/checkpoint.json" \
+              ".data/mca/r2-checkpoint.json" \
+              --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com" \
+              --region auto --only-show-errors --no-progress
+          else
+            echo "No existing R2 checkpoint. Starting at offset zero."
+          fi
+
+      - name: Download and persist MCA pages to R2
         shell: bash
         env:
-          MAX_RECORDS: ${{ inputs.max_records }}
+          MAX_RECORDS: \${{ inputs.max_records }}
         run: |
           set -euo pipefail
           if [ "$MAX_RECORDS" = "0" ]; then
-            node scripts/mca-download.mjs --page-size=10000 --delay-ms=1000
+            node scripts/mca-download-r2.mjs --page-size=10000 --delay-ms=1000
           else
-            node scripts/mca-download.mjs --max-records="$MAX_RECORDS" --page-size=1000 --delay-ms=250
+            node scripts/mca-download-r2.mjs --max-records="$MAX_RECORDS" --page-size=1000 --delay-ms=250
           fi
-      - name: Build compact R2 token index
-        run: node scripts/mca-build-r2-index.mjs --shard-size=1000
-      - name: Upload index shards to Cloudflare R2
+
+      - name: Restore all persisted MCA pages for index generation
         shell: bash
         run: |
           set -euo pipefail
-          aws s3 sync ".data/mca/r2-index/" "s3://$R2_BUCKET_NAME/"             --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com"             --region auto --only-show-errors --no-progress --delete
-      - name: Report national index coverage
+          aws s3 sync "s3://$R2_BUCKET_NAME/ingestion/mca/pages/" ".data/mca/pages/" \
+            --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com" \
+            --region auto --only-show-errors --no-progress
+          : > .data/mca/company-master.ndjson
+          while IFS= read -r -d '' file; do
+            gzip -cd "$file" >> .data/mca/company-master.ndjson
+          done < <(find .data/mca/pages -type f -name 'page-*.ndjson.gz' -print0 | sort -z)
+          node --input-type=module -e '
+            import { createReadStream } from "node:fs";
+            import readline from "node:readline";
+            const { readFile } = await import("node:fs/promises");
+            const checkpoint = JSON.parse(await readFile(".data/mca/r2-checkpoint.json", "utf8"));
+            let rows = 0;
+            for await (const line of readline.createInterface({ input:createReadStream(".data/mca/company-master.ndjson"), crlfDelay:Infinity })) {
+              if (!line.trim()) continue;
+              const row = JSON.parse(line);
+              if (!row.cin || !row.name) throw new Error("Invalid normalized row in MCA snapshot.");
+              rows++;
+            }
+            if (rows !== checkpoint.usableRecords) {
+              throw new Error("Snapshot mismatch: assembled " + rows + " rows but checkpoint expects " + checkpoint.usableRecords + ".");
+            }
+            console.log(JSON.stringify({assembledRows:rows, downloadedRecords:checkpoint.downloadedRecords, sourceTotal:checkpoint.totalRecords, sourceUpdatedAt:checkpoint.sourceUpdatedAt, complete:checkpoint.complete}, null, 2));
+          '
+
+      - name: Build compressed token index and per-token manifests
+        run: node scripts/mca-build-r2-index.mjs --shard-size=10000
+
+      - name: Verify index coverage before publishing
+        shell: bash
+        env:
+          MAX_RECORDS: \${{ inputs.max_records }}
         run: |
-          node -e 'const m=require("./.data/mca/r2-index/index-manifest.json"); console.log(JSON.stringify({importedCompanies:m.importedCompanies,tokenPostings:m.tokenPostings,uniqueTokens:m.uniqueTokens,shardCount:m.shardCount,sourceUpdatedAt:m.sourceUpdatedAt,generatedAt:m.generatedAt},null,2))'
+          set -euo pipefail
+          node --input-type=module -e '
+            import { readFile } from "node:fs/promises";
+            const checkpoint = JSON.parse(await readFile(".data/mca/r2-checkpoint.json", "utf8"));
+            const index = JSON.parse(await readFile(".data/mca/r2-index/index-manifest.json", "utf8"));
+            if (index.importedCompanies !== checkpoint.usableRecords) {
+              throw new Error("Index coverage does not match the persisted MCA snapshot.");
+            }
+            if (process.env.MAX_RECORDS === "0" && !checkpoint.complete) {
+              throw new Error("Refusing to publish: the MCA snapshot is not complete. Run the workflow again to resume.");
+            }
+            console.log(JSON.stringify({
+              importedCompanies:index.importedCompanies,
+              sourceRecords:checkpoint.downloadedRecords,
+              sourceTotal:checkpoint.totalRecords,
+              tokenPostings:index.tokenPostings,
+              uniqueTokens:index.uniqueTokens,
+              shardCount:index.shardCount,
+              manifestCount:index.tokenManifestCount,
+              sourceUpdatedAt:index.sourceUpdatedAt,
+              complete:checkpoint.complete
+            }, null, 2));
+          '
+
+      - name: Publish complete index or isolated staging test
+        shell: bash
+        env:
+          MAX_RECORDS: \${{ inputs.max_records }}
+        run: |
+          set -euo pipefail
+          if [ "$MAX_RECORDS" = "0" ]; then
+            TARGET_PREFIX="index/"
+            echo "Publishing complete MCA index to index/."
+          else
+            TARGET_PREFIX="staging/index/"
+            echo "Publishing capped test index to staging/index/. Production index is unchanged."
+          fi
+          aws s3 sync ".data/mca/r2-index/" "s3://$R2_BUCKET_NAME/$TARGET_PREFIX" \
+            --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com" \
+            --region auto --only-show-errors --no-progress --delete
+          aws s3 cp ".data/mca/r2-index/index-manifest.json" "s3://$R2_BUCKET_NAME/$TARGET_PREFIX"index-manifest.json \
+            --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com" \
+            --region auto --only-show-errors --no-progress
+          echo "Published manifest to s3://$R2_BUCKET_NAME/$TARGET_PREFIX"
+
+      - name: Report import result
+        run: |
+          node --input-type=module -e '
+            import { readFile } from "node:fs/promises";
+            const checkpoint = JSON.parse(await readFile(".data/mca/r2-checkpoint.json", "utf8"));
+            const index = JSON.parse(await readFile(".data/mca/r2-index/index-manifest.json", "utf8"));
+            console.log(JSON.stringify({
+              downloadedRecords:checkpoint.downloadedRecords,
+              sourceTotal:checkpoint.totalRecords,
+              complete:checkpoint.complete,
+              importedCompanies:index.importedCompanies,
+              tokenPostings:index.tokenPostings,
+              uniqueTokens:index.uniqueTokens,
+              shardCount:index.shardCount,
+              tokenManifestCount:index.tokenManifestCount,
+              sourceUpdatedAt:index.sourceUpdatedAt
+            }, null, 2));
+          '
