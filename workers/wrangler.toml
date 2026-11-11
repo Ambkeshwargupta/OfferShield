@@ -25,3 +25,7 @@ crons = ["15 3 * * *"]
 [[r2_buckets]]
 binding = "COMPANY_INDEX"
 bucket_name = "offershield-company-index"
+
+# Workers AI powers screenshot/PDF parsing and structured internship/offer analysis.
+[ai]
+binding = "AI"
