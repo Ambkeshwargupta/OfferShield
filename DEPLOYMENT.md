@@ -19,11 +19,12 @@ See [workers/README.md](workers/README.md).
 3. Create D1 database and apply `workers/schema.sql`.
 4. Add the D1 binding in `workers/wrangler.toml`.
 5. Store `DATA_GOV_API_KEY` as a Worker secret.
-6. Deploy the Worker.
-7. Copy the Worker URL into OfferShield → Advanced Search & Intelligence → API connection.
-8. Test the API status badge and run a CIN lookup, domain scan and header parse.
+6. Confirm the [ai] binding named AI is present in workers/wrangler.toml. This enables Workers AI model inference and Markdown conversion for screenshots and offer documents.
+7. Deploy the Worker.
+8. Copy the Worker URL into OfferShield → Advanced Search & Intelligence → API connection.
+9. Test the API status badge. It should report Workers AI enabled before trying screenshot/PDF analysis; then test a company lookup, domain scan and header parse.
 
-The MCA OGD connector is available only when a data.gov.in key is configured. GST/Udyam remain official manual verification flows. D1 caching/rate limiting require the D1 binding.
+The MCA OGD connector is available only when a data.gov.in key is configured. Udyam regional enterprise discovery uses the OGD resource; exact certificate verification remains manual. AI internship/offer uploads require the Workers AI binding and are usage-metered. D1 caching/rate limiting require the D1 binding.
 
 ## C. Local Node prototype
 
