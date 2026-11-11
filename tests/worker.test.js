@@ -15,6 +15,15 @@ test("health endpoint describes configuration without exposing secrets", async()
   assert.equal(JSON.stringify(body).includes("secret-value"),false);
 });
 
+test("health endpoint reports community intelligence only after its D1 migration exists", async()=>{
+  const db={prepare(sql){assert.match(sql,/sqlite_master/);return {first:async()=>({name:"community_reports"})}}};
+  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/health"),env({DB:db}),ctx);
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.d1Configured,true);
+  assert.equal(body.communityIntelligenceConfigured,true);
+});
+
 test("rejects invalid company registration identifiers", async()=>{
   const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/company/not-a-cin"),env(),ctx);
   assert.equal(response.status,400);
