@@ -19,7 +19,7 @@ function response(data, status = 200, origin = "*") {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
       "access-control-allow-origin": origin,
-      "access-control-allow-methods": "GET,POST,OPTIONS",
+      "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
       "access-control-allow-headers": "content-type",
       "vary": "Origin",
       "x-content-type-options": "nosniff"
