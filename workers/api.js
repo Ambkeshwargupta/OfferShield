@@ -782,6 +782,151 @@ async function deleteCommunityRecruitmentReport(request, env, reportId, origin) 
   }
 }
 
+
+const FREE_MAIL_DOMAINS = new Set([
+  "gmail.com","googlemail.com","yahoo.com","yahoo.co.in","outlook.com","hotmail.com",
+  "live.com","icloud.com","proton.me","protonmail.com","rediffmail.com","aol.com"
+]);
+const ROLE_MAILBOX_PREFIXES = new Set([
+  "info","hello","contact","support","help","admin","office","hr","careers","career",
+  "jobs","recruitment","recruiting","talent","people","ops","operations","program",
+  "programs","team","internships","internship"
+]);
+function classifyRecruiterEmailEvidence(emailValue, websiteValue) {
+  const email = cleanText(emailValue,180).trim().toLowerCase();
+  const match = email.match(/^([^@\s]+)@([^@\s]+)$/);
+  if (!match) return {provided:!!email,domain:null,mailboxType:"unknown",websiteDomainMatch:"not_checked",note:email?"The supplied email address could not be parsed.":"No recruiter email was supplied."};
+  const local = match[1];
+  const domain = normalizeDomain(match[2]);
+  const websiteDomain = normalizeDomain(websiteValue);
+  const provider = FREE_MAIL_DOMAINS.has(domain);
+  const domainMatch = !!(domain && websiteDomain && (domain===websiteDomain || domain.endsWith("."+websiteDomain)));
+  const roleBased = ROLE_MAILBOX_PREFIXES.has(local) || /^(hr|ops|info|career|jobs|support)[._-]/.test(local);
+  return {
+    provided:true,
+    domain,
+    mailboxType:provider?"consumer_provider":(roleBased?"role_based_business_mailbox":"business_domain_mailbox"),
+    websiteDomainMatch:domainMatch?"matches_student_supplied_website":(websiteDomain?"does_not_match_student_supplied_website":"not_checked"),
+    note:provider
+      ?"This address uses a consumer email provider. That alone does not prove fraud."
+      :domainMatch
+        ?(roleBased?"This role-based business mailbox uses the same domain as the website supplied by the student. It is a consistency signal, not proof of recruiter authority.":"This business-domain email uses the same domain as the website supplied by the student. It is a consistency signal, not proof of recruiter authority.")
+        :"This is a business-domain email, but it does not match the website domain supplied by the student (or no website was supplied). Independently confirm the address."
+  };
+}
+function companyNameSearchVariants(value) {
+  const raw = cleanText(value,180).toUpperCase().replace(/[^A-Z0-9& ]+/g," ").replace(/\s+/g," ").trim();
+  if (!raw) return [];
+  const stripped = raw.replace(/\b(PRIVATE LIMITED|PVT\s+LTD|PVT LTD|PVT|LIMITED|LTD|LLP|OPC)\b/g," ").replace(/\s+/g," ").trim();
+  const variants = [raw,stripped];
+  if (stripped) {
+    variants.push(stripped+" PRIVATE LIMITED");
+    variants.push(stripped+" LIMITED");
+  }
+  return [...new Set(variants.filter(x=>x.length>=3))].slice(0,4);
+}
+function detectEvidenceDocumentType(files, evidence, modelType = "unclear") {
+  const fileNames = (files||[]).map(x=>x.name||"").join(" ").toLowerCase();
+  const text = String(evidence||"").toLowerCase();
+  const combined = fileNames+" "+text;
+  if (/internship[ _-]*(completion[ _-]*)?certificate|certificate[ _-]*of[ _-]*internship|successfully completed.{0,100}internship|completed the internship|has completed.{0,80}internship/.test(combined)) return "internship_certificate";
+  if (/experience[ _-]*letter|relieving[ _-]*letter|employment[ _-]*certificate/.test(combined)) return "experience_letter";
+  if (/appointment[ _-]*letter/.test(combined)) return "appointment_letter";
+  if (/offer[ _-]*letter|letter[ _-]*of[ _-]*offer|internship offer/.test(combined)) return "offer_letter";
+  if (/job description|\bjd\b|role responsibilities/.test(combined)) return "job_description";
+  if (/recruitment message|interview invitation|shortlisted for/.test(combined)) return "recruitment_message";
+  return ["offer_letter","internship_certificate","experience_letter","appointment_letter","job_description","recruitment_message","other"].includes(modelType) ? modelType : "unclear";
+}
+function searchResultHost(value) {
+  try { return new URL(value).hostname.replace(/^www\./,"").toLowerCase(); } catch { return ""; }
+}
+async function tavilySearch(env, query, topic = "general") {
+  if (!env.TAVILY_API_KEY) return {configured:false,results:[],error:"Tavily web search is not configured. Add TAVILY_API_KEY to the Cloudflare Worker to enable automatic public-footprint research."};
+  const cacheKey = "tavily:"+await sha256(topic+"|"+query.toLowerCase());
+  try {
+    const cached = await cachedGet(env,cacheKey);
+    if (cached) return {...cached,cached:true};
+  } catch {}
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(),12000);
+  try {
+    const upstream = await fetch("https://api.tavily.com/search",{
+      method:"POST",
+      signal:controller.signal,
+      headers:{"content-type":"application/json","authorization":"Bearer "+env.TAVILY_API_KEY},
+      body:JSON.stringify({query,search_depth:"basic",topic,max_results:5,country:"India",include_answer:false,include_raw_content:false,include_usage:true})
+    });
+    if (!upstream.ok) return {configured:true,results:[],error:upstream.status===401?"The web-search API key was rejected. Check TAVILY_API_KEY.":upstream.status===429?"The web-search provider rate/credit limit was reached.":"The web-search provider could not complete this query.",status:upstream.status};
+    const payload = await upstream.json();
+    const results = (payload.results||[]).slice(0,5).map(item=>({
+      title:cleanText(item.title,220),
+      url:cleanText(item.url,700),
+      snippet:cleanText(item.content,1000),
+      score:Number(item.score||0),
+      publishedDate:item.published_date||null,
+      host:searchResultHost(item.url)
+    })).filter(item=>item.title&&/^https?:\/\//i.test(item.url));
+    const result = {configured:true,results,usage:payload.usage||null,provider:"Tavily Search"};
+    try { await cachedPut(env,cacheKey,result,43200); } catch {}
+    return result;
+  } catch (error) {
+    return {configured:true,results:[],error:error.name==="AbortError"?"Public web search timed out.":"The public web-search provider could not be reached."};
+  } finally { clearTimeout(timer); }
+}
+async function searchCompanyDigitalFootprint(env, companyName, website, recruiterName = "") {
+  const name = cleanText(companyName,180).trim();
+  const domain = normalizeDomain(website);
+  if (!name && !domain) return {configured:!!env.TAVILY_API_KEY,presence:"not_searched",sources:[],note:"Add a company name or website to search its public footprint."};
+  if (!env.TAVILY_API_KEY) return {configured:false,provider:"Tavily Search",presence:"not_searched",sources:[],signals:{website:false,linkedinCompany:false,companyHistory:false,jobsOrReviews:false},note:"Automatic public-web research is not enabled yet. Configure TAVILY_API_KEY; manual Google/LinkedIn discovery links remain available."};
+  const subject = name || domain;
+  const queries = [
+    {category:"company_website",label:"Company website and profile",query:'"'+subject+'" '+(domain||"")+" official website company India",topic:"general"},
+    {category:"linkedin_company",label:"Public LinkedIn company page",query:'site:linkedin.com/company "'+subject+'"',topic:"general"},
+    {category:"company_history",label:"Company history, leadership, partnerships and news",query:'"'+subject+'" India founders history partnerships clients events',topic:"news"},
+    {category:"jobs_reviews",label:"Hiring, internships and employee experiences",query:'"'+subject+'" internship jobs hiring employee reviews interns India',topic:"general"}
+  ];
+  if (recruiterName) queries.push({category:"recruiter_public_profile",label:"Public recruiter profile references",query:'"'+cleanText(recruiterName,100)+'" "'+subject+'" professional profile',topic:"general"});
+  const searched = await Promise.all(queries.map(async item=>({...item,...await tavilySearch(env,item.query,item.topic)})));
+  const byUrl = new Map();
+  for (const item of searched) {
+    for (const result of item.results||[]) {
+      const prior = byUrl.get(result.url);
+      if (prior) {
+        if (!prior.categories.includes(item.category)) prior.categories.push(item.category);
+        if (result.snippet.length>prior.snippet.length) prior.snippet=result.snippet;
+      } else {
+        byUrl.set(result.url,{...result,categories:[item.category],queryLabel:item.label});
+      }
+    }
+  }
+  const sources = [...byUrl.values()].slice(0,24);
+  const linkedinCompany = sources.filter(x=>x.host==="linkedin.com"||x.host.endsWith(".linkedin.com")).filter(x=>x.url.toLowerCase().includes("/company/"));
+  const companySite = sources.filter(x=>domain && (x.host===domain||x.host.endsWith("."+domain)));
+  const history = sources.filter(x=>x.categories.includes("company_history"));
+  const jobsReviews = sources.filter(x=>x.categories.includes("jobs_reviews"));
+  const recruiterProfiles = sources.filter(x=>x.categories.includes("recruiter_public_profile"));
+  const independentHosts = new Set(sources.filter(x=>!domain||!(x.host===domain||x.host.endsWith("."+domain))).map(x=>x.host).filter(Boolean));
+  const presence = (companySite.length>0 && linkedinCompany.length>0 && independentHosts.size>=2)
+    ?"broad_public_footprint"
+    :(sources.length>=3 && independentHosts.size>=2)?"some_public_footprint"
+    :sources.length?"limited_public_footprint":"no_indexed_results";
+  return {
+    configured:true,provider:"Tavily Search",presence,
+    searchedAt:new Date().toISOString(),queriesRun:searched.length,
+    signals:{
+      suppliedWebsiteReferenced:companySite.length>0,
+      linkedinCompanyPagesFound:linkedinCompany.length,
+      companyHistoryOrNewsResults:history.length,
+      jobsOrEmployeeExperienceResults:jobsReviews.length,
+      recruiterProfileReferences:recruiterProfiles.length,
+      distinctExternalHosts:independentHosts.size
+    },
+    sources,
+    queryStatus:searched.map(x=>({category:x.category,configured:x.configured,resultCount:(x.results||[]).length,error:x.error||null,usage:x.usage||null})),
+    note:"These are publicly indexed search results, not direct LinkedIn account verification, company authentication, or proof that a specific recruiter or vacancy is authorised. Search results can be stale, incomplete or about a similarly named entity."
+  };
+}
+
 async function analyseInternshipUpload(request, env, origin) {
   if (!env.AI || typeof env.AI.run !== "function" || typeof env.AI.toMarkdown !== "function") {
     return jsonError("Workers AI is not enabled. Add the AI binding in Cloudflare and redeploy this Worker.",503,origin,"ai_not_enabled");
