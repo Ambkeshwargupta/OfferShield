@@ -136,7 +136,7 @@ test("navigation and hero actions have a capture-phase click fallback", () => {
 test("new-offer review requires key recruitment facts and actual offer evidence",()=>{
   for(const id of ["riskSourceChannel","riskContactChannel","riskPaymentAsked","riskSelectionProcess","riskWrittenOffer","riskOfferStage"]) assert.match(html,new RegExp('id="'+id+'" data-risk-required'));
   assert.match(html,/Complete the seven required risk questions/);
-  assert.match(html,/Add the recruiter message, offer details or at least one screenshot\/document/);
+  assert.match(html,/Add a recruiter message, offer details or at least one screenshot\/document/);
 });
 test("new-offer results start with a visual warning-signal donut and category breakdown",()=>{
   assert.match(html,/riskDashboardHtml/);assert.match(html,/risk-donut/);assert.match(html,/risk-breakdown/);assert.match(html,/not a probability of fraud/i);
