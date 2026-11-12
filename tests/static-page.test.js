@@ -133,10 +133,13 @@ test("navigation and hero actions have a capture-phase click fallback", () => {
   assert.match(goSource, /\$\$\("\.nav button"\)\.forEach/);
 });
 
-test("new-offer review requires key recruitment facts and actual offer evidence",()=>{
-  for(const id of ["riskSourceChannel","riskContactChannel","riskPaymentAsked","riskSelectionProcess","riskWrittenOffer","riskOfferStage"]) assert.match(html,new RegExp('id="'+id+'" data-risk-required'));
-  assert.match(html,/Complete the seven required risk questions/);
-  assert.match(html,/Add a recruiter message, offer details or at least one screenshot\/document/);
+test("new-offer review requires only company and evidence, with two optional quick checks",()=>{
+  assert.match(html,/id="offerCompanyName" required/);
+  assert.match(html,/id="offerFiles"/);
+  assert.match(html,/id="riskPaymentAsked"/);
+  assert.match(html,/id="riskPaymentMade"/);
+  assert.match(html,/optional-company-details/);
+  assert.doesNotMatch(html,/Complete the seven required risk questions/);
 });
 test("new-offer results start with a visual warning-signal donut and category breakdown",()=>{
   assert.match(html,/riskDashboardHtml/);assert.match(html,/risk-donut/);assert.match(html,/risk-breakdown/);assert.match(html,/not a probability of fraud/i);
@@ -145,25 +148,25 @@ test("investigation page uses a visual hero, workflow stepper and progressive in
   assert.match(html,/verify-hero/);assert.match(html,/workflow-strip/);assert.match(html,/START A NEW REVIEW/);assert.match(html,/updateScreeningProgress/);
 });
 
-test("new-offer intake shows the actual-transfer question and personal payment destination",()=>{
-  assert.match(html,/id="riskPaymentMade" data-risk-required/);
+test("payment destination and source details are optional progressive disclosures",()=>{
+  assert.match(html,/id="riskPaymentMade"/);
   assert.match(html,/id="riskPaymentRecipient"/);
-  assert.match(html,/seven required risk questions/);
-  assert.match(html,/paymentMade/);
+  assert.match(html,/optional-screening/);
+  assert.doesNotMatch(html,/data-risk-required/);
 });
-test("investigation form is a visual three-step workflow",()=>{
+test("investigation form is a visual evidence-first workflow",()=>{
   assert.match(html,/verify-hero/);
   assert.match(html,/workflow-strip/);
-  assert.match(html,/companySectionHeading/);
+  assert.match(html,/optional-company-details/);
   assert.match(html,/offerScreening/);
   assert.match(html,/evidenceSectionHeading/);
-  assert.match(html,/START A NEW REVIEW/);
 });
-test("result summary starts with a donut warning-signal index and category bars",()=>{
+test("result summary uses a visual dashboard with gauge, factor bars and insight cards",()=>{
   assert.match(html,/riskDashboardHtml/);
   assert.match(html,/risk-donut/);
   assert.match(html,/risk-breakdown/);
-  assert.match(html,/decisionAtGlanceHtml/);
+  assert.match(html,/result-insight-grid/);
+  assert.match(html,/result-dashboard-card/);
   assert.match(html,/not a probability of fraud/i);
 });
 test("past experience and background-only review modes hide new-offer questions",()=>{
@@ -171,11 +174,12 @@ test("past experience and background-only review modes hide new-offer questions"
   assert.match(html,/company_background/);
 });
 
-test("new-offer intake requires the actual-payment status in addition to payment request status",()=>{
-  assert.match(html,/id="riskPaymentAsked" data-risk-required/);
-  assert.match(html,/id="riskPaymentMade" data-risk-required/);
-  assert.match(html,/id="riskPaymentRecipient"/);
-  assert.match(html,/seven required risk questions/);
+test("two quick answer tiles provide a concise warning-signal assessment",()=>{
+  assert.match(html,/data-answer-target="riskPaymentAsked"/);
+  assert.match(html,/data-answer-target="riskPaymentMade"/);
+  assert.match(html,/function syncAnswerTiles/);
+  assert.match(html,/aria-pressed/);
+  assert.doesNotMatch(html,/data-risk-required/);
 });
 test("the application starts in new-offer mode but supports certificate and background-only modes",()=>{
   assert.match(html,/<option value="new_offer">A new offer or recruitment message/);
