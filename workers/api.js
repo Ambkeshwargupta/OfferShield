@@ -971,7 +971,7 @@ async function analyseInternshipUpload(request, env, origin) {
   if (files.length > 5) return jsonError("Upload no more than five files at a time.",400,origin,"too_many_files");
   if (files.reduce((sum,file)=>sum+file.size,0) > 12 * 1024 * 1024) return jsonError("Keep all uploaded files below 12 MB total.",413,origin,"upload_too_large");
   if (!companyName && !messageText && !notes && !files.length) return jsonError("Enter a company name, paste the message or upload evidence.",400,origin,"evidence_required");
-  if (!["past_internship","certificate_review","company_background"].includes(reviewPurpose)) {
+  if (reviewPurpose === "new_offer") {
     const requiredAnswers=["sourceChannel","contactChannel","paymentAsked","paymentMade","selectionProcess","writtenOffer","offerStage"];
     const missingAnswers=requiredAnswers.filter(key=>!screeningAnswers[key]);
     if (!companyName) return jsonError("Enter the employer name.",400,origin,"company_required");

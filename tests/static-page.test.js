@@ -135,7 +135,7 @@ test("navigation and hero actions have a capture-phase click fallback", () => {
 
 test("new-offer review requires key recruitment facts and actual offer evidence",()=>{
   for(const id of ["riskSourceChannel","riskContactChannel","riskPaymentAsked","riskSelectionProcess","riskWrittenOffer","riskOfferStage"]) assert.match(html,new RegExp('id="'+id+'" data-risk-required'));
-  assert.match(html,/Complete the six required risk questions/);
+  assert.match(html,/Complete the seven required risk questions/);
   assert.match(html,/Add the recruiter message, offer details or at least one screenshot\/document/);
 });
 test("new-offer results start with a visual warning-signal donut and category breakdown",()=>{
@@ -169,4 +169,17 @@ test("result summary starts with a donut warning-signal index and category bars"
 test("past experience and background-only review modes hide new-offer questions",()=>{
   assert.match(html,/function toggleOfferScreening/);
   assert.match(html,/company_background/);
+});
+
+test("new-offer intake requires the actual-payment status in addition to payment request status",()=>{
+  assert.match(html,/id="riskPaymentAsked" data-risk-required/);
+  assert.match(html,/id="riskPaymentMade" data-risk-required/);
+  assert.match(html,/id="riskPaymentRecipient"/);
+  assert.match(html,/seven required risk questions/);
+});
+test("the application starts in new-offer mode but supports certificate and background-only modes",()=>{
+  assert.match(html,/<option value="new_offer">A new offer or recruitment message/);
+  assert.match(html,/function toggleOfferScreening/);
+  assert.match(html,/value="certificate_review"/);
+  assert.match(html,/value="company_background"/);
 });
