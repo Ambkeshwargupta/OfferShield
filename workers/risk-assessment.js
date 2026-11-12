@@ -3,7 +3,7 @@ const UNKNOWN = new Set(["","unknown","not_sure","unsure","not_known"]);
 export function calculateRiskAssessment({answers={},evidence="",hasFiles=false,reviewPurpose="auto",documentType="unclear",matchedPatterns=[]}={}) {
  const past=["past_internship","certificate_review","company_background"].includes(reviewPurpose)||["internship_certificate","experience_letter"].includes(documentType);
  if(past)return {available:false,score:null,band:"not_applicable",coverage:0,answered:0,required:6,breakdown:[],signals:[],note:"A new-offer risk score is not appropriate for a completed internship or company-background review."};
- const keys=["sourceChannel","contactChannel","paymentAsked","selectionProcess","writtenOffer","offerStage"];
+ const keys=["sourceChannel","contactChannel","paymentAsked","paymentMade","selectionProcess","writtenOffer","offerStage"];
  const answered=keys.filter(k=>!UNKNOWN.has(String(answers[k]||"").toLowerCase())).length;
  const evidenceProvided=String(evidence).trim().length>=8||hasFiles;
  const coverage=Math.min(100,Math.round(answered/keys.length*70+(evidenceProvided?30:0)));
@@ -24,7 +24,11 @@ export function calculateRiskAssessment({answers={},evidence="",hasFiles=false,r
   if(a.paymentType==="task_wallet_recharge")add("payment",18,"A wallet recharge or task deposit was requested.");
   if(a.paymentType==="training_fee")add("payment",6,"A training fee is tied to the opportunity; inspect its terms and placement promise.");
   if(a.paymentStage==="repeated")add("payment",10,"Repeated or escalating payment requests were reported.");
+  if(a.paymentMade==="yes")add("payment",15,"The candidate confirms money was actually transferred.");
+  if(a.paymentRecipient==="personal_upi")add("payment",12,"Money was sent to a personal UPI ID or an individual bank account.");
  }
+ if(a.paymentMade==="yes"&&a.paymentAsked==="no")add("pressure",10,"The candidate says money was transferred but also says no payment was requested; clarify who initiated the transfer and why.");
+ if(a.paymentRecipient==="personal_upi"&&a.paymentAsked!=="yes")add("payment",8,"Payment destination was a personal account, although the questionnaire does not record a payment request.");
  if(a.pressure==="yes")add("pressure",8,"Urgency, a limited slot or pressure to pay/decide quickly was reported.");
  if(a.contactChannel==="personal_email")add("recruiter",10,"The recruiter used a personal email account.");
  if(["whatsapp_only","telegram_only"].includes(a.contactChannel))add("recruiter",8,"Recruitment communication happened only through a messaging app.");
