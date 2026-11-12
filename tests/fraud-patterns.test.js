@@ -41,3 +41,15 @@ test("additional FITE company-name mentions are not used as exact company matche
  const result=evaluateFraudPatterns("A candidate was asked to pay a placement fee.","Kavya Tech");
  assert.equal(result.companySpecificCases.some(item=>item.id==="fite-additional-pune-company-mentions-2026"),false);
 });
+
+test("recognises staged refund-fee escalation and fake government-employer internship messages",()=>{
+ const staged=evaluateFraudPatterns("The caller promised a refund, then requested another selection fee, an additional verification payment and GST charges.","");
+ const army=evaluateFraudPatterns("This is a fake Indian Army internship email with an unusually high stipend.","");
+ assert.ok(staged.matchedPatterns.some(item=>item.id==="staged_refund_fee_escalation"));
+ assert.ok(staged.matchedPatterns.some(item=>item.id==="upfront_payment_for_job"));
+ assert.ok(army.matchedPatterns.some(item=>item.id==="government_employer_impersonation"));
+});
+test("paid-training pattern is a review prompt, not a fraud verdict",()=>{
+ const result=evaluateFraudPatterns("Pay a training and placement fee before receiving your job joining letter.","");
+ assert.ok(result.matchedPatterns.some(item=>item.id==="paid_training_and_placement"));
+});
