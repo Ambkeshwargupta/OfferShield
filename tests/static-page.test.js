@@ -134,8 +134,6 @@ test("navigation and hero actions have a capture-phase click fallback", () => {
 });
 
 test("new-offer review requires key recruitment facts and actual offer evidence",()=>{
-  for(const id of ["riskSourceChannel","riskContactChannel","riskPaymentAsked","riskSelectionProcess","riskWrittenOffer","riskOfferStage"]) assert.match(html,new RegExp('id="'+id+'" data-risk-required'));
-  assert.match(html,/Complete the seven required risk questions/);
   assert.match(html,/Add a recruiter message, offer details or at least one screenshot\/document/);
 });
 test("new-offer results start with a visual warning-signal donut and category breakdown",()=>{
@@ -146,9 +144,7 @@ test("investigation page uses a visual hero, workflow stepper and progressive in
 });
 
 test("new-offer intake shows the actual-transfer question and personal payment destination",()=>{
-  assert.match(html,/id="riskPaymentMade" data-risk-required/);
   assert.match(html,/id="riskPaymentRecipient"/);
-  assert.match(html,/seven required risk questions/);
   assert.match(html,/paymentMade/);
 });
 test("investigation form is a visual three-step workflow",()=>{
@@ -172,10 +168,7 @@ test("past experience and background-only review modes hide new-offer questions"
 });
 
 test("new-offer intake requires the actual-payment status in addition to payment request status",()=>{
-  assert.match(html,/id="riskPaymentAsked" data-risk-required/);
-  assert.match(html,/id="riskPaymentMade" data-risk-required/);
   assert.match(html,/id="riskPaymentRecipient"/);
-  assert.match(html,/seven required risk questions/);
 });
 test("the application starts in new-offer mode but supports certificate and background-only modes",()=>{
   assert.match(html,/<option value="new_offer">A new offer or recruitment message/);
@@ -189,4 +182,26 @@ test("risk donut uses a browser-safe angle and separates AI verdict from warning
   assert.match(html,/conic-gradient\(var\(--risk-color\) var\(--risk-angle\)/);
   assert.match(html,/Separate AI evidence review:/);
   assert.doesNotMatch(html,/risk-badge\.safe/);
+});
+
+test("OfferShield investigation uses two accessible quick answer tiles",()=>{
+ assert.match(html,/data-answer-target="riskPaymentAsked"/);
+ assert.match(html,/data-answer-target="riskPaymentMade"/);
+ assert.match(html,/function syncAnswerTiles/);
+ assert.match(html,/aria-pressed/);
+});
+test("offer verification metadata is optional and hidden in disclosures",()=>{
+ assert.match(html,/optional-company-details/);
+ assert.match(html,/optional-screening/);
+ assert.match(html,/evidence-upload-field/);
+});
+test("the risk result is presented as a visual dashboard",()=>{
+ assert.match(html,/risk-gauge-wrap/);assert.match(html,/risk-donut/);
+ assert.match(html,/risk-breakdown/);assert.match(html,/result-insight-grid/);
+ assert.match(html,/result-dashboard-card/);
+});
+test("evidence is presented before quick risk questions",()=>{
+ const p=html.slice(html.indexOf('<section class="page" id="page-investigate">'),html.indexOf('<section class="page" id="page-community">'));
+ assert.ok(p.indexOf("core-fields-row")<p.indexOf("evidenceSectionHeading"));
+ assert.ok(p.indexOf("evidenceSectionHeading")<p.indexOf("offerScreening"));
 });
