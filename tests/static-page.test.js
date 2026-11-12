@@ -144,3 +144,29 @@ test("new-offer results start with a visual warning-signal donut and category br
 test("investigation page uses a visual hero, workflow stepper and progressive intake",()=>{
   assert.match(html,/verify-hero/);assert.match(html,/workflow-strip/);assert.match(html,/START A NEW REVIEW/);assert.match(html,/updateScreeningProgress/);
 });
+
+test("new-offer intake shows the actual-transfer question and personal payment destination",()=>{
+  assert.match(html,/id="riskPaymentMade" data-risk-required/);
+  assert.match(html,/id="riskPaymentRecipient"/);
+  assert.match(html,/seven required risk questions/);
+  assert.match(html,/paymentMade/);
+});
+test("investigation form is a visual three-step workflow",()=>{
+  assert.match(html,/verify-hero/);
+  assert.match(html,/workflow-strip/);
+  assert.match(html,/companySectionHeading/);
+  assert.match(html,/offerScreening/);
+  assert.match(html,/evidenceSectionHeading/);
+  assert.match(html,/START A NEW REVIEW/);
+});
+test("result summary starts with a donut warning-signal index and category bars",()=>{
+  assert.match(html,/riskDashboardHtml/);
+  assert.match(html,/risk-donut/);
+  assert.match(html,/risk-breakdown/);
+  assert.match(html,/decisionAtGlanceHtml/);
+  assert.match(html,/not a probability of fraud/i);
+});
+test("past experience and background-only review modes hide new-offer questions",()=>{
+  assert.match(html,/function toggleOfferScreening/);
+  assert.match(html,/company_background/);
+});

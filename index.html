@@ -190,12 +190,12 @@
       <div class="card form-card"><div class="form-intro"><div><div class="eyebrow">START A NEW REVIEW</div><h2>Tell us about the opportunity</h2><p>Required answers help calculate a transparent warning-signal index. “Not sure” is a valid answer.</p></div><span class="form-security-tag">🔒 Private evidence review</span></div>
         <div class="intake-section-head" id="companySectionHeading"><span class="intake-number">01</span><div><h3>Company & opportunity</h3><p>Identify the employer and the role you were offered.</p></div></div>
         <div class="form-row">
-          <div class="field"><label for="offerCompanyName">Company / startup name <i class="required-star">*</i></label><input id="offerCompanyName" placeholder="e.g. ABC Technologies Pvt. Ltd."><small>Recommended: this lets OfferShield search the MCA index. Add State and District below for Udyam MSME discovery.</small></div>
+          <div class="field"><label for="offerCompanyName">Company / startup name <i class="required-star">*</i></label><input id="offerCompanyName" required autocomplete="organization" placeholder="e.g. ABC Technologies Pvt. Ltd."><small>Recommended: this lets OfferShield search the MCA index. Add State and District below for Udyam MSME discovery.</small></div>
           <div class="field"><label for="investigateCompany">Existing reference profile (optional)</label><select id="investigateCompany"><option value="">No reference profile selected</option></select><small>Choose a curated reference profile, or enter any company name on the left.</small></div>
         </div>
         <div class="form-row">
           <div class="field"><label for="offerWebsite">Company website (if known)</label><input id="offerWebsite" placeholder="https://company.in"></div>
-          <div class="field"><label for="offerRole">Internship / job role <i class="required-star">*</i></label><input id="offerRole" placeholder="e.g. Digital Marketing Intern"></div>
+          <div class="field"><label for="offerRole">Internship / job role <i class="required-star">*</i></label><input id="offerRole" required placeholder="e.g. Digital Marketing Intern"></div>
         </div>
         <div class="form-row">
           <div class="field"><label for="reviewPurpose">What are you checking?</label><select id="reviewPurpose"><option value="auto">Auto-detect from documents</option><option value="new_offer">A new internship / job offer</option><option value="past_internship">A company where I already interned/worked</option><option value="certificate_review">An internship completion / experience certificate</option><option value="company_background">Company background only</option></select><small>A certificate from a completed internship is reviewed as past-experience evidence, not judged like a new offer.</small></div>
@@ -206,7 +206,7 @@
           <div class="field"><label for="offerRecruiter">Recruiter name (optional)</label><input id="offerRecruiter" placeholder="Name shown in the message"></div>
           <div class="field"><label for="offerRecruiterEmail">Recruiter email (optional)</label><input id="offerRecruiterEmail" placeholder="hr@company.in"></div>
         </div>
-        <div class="field"><label for="offerSourceUrl">Where did you find this internship? (optional)</label><input id="offerSourceUrl" placeholder="Job portal, LinkedIn post, WhatsApp group or application link"></div>
+        <div class="field"><label for="offerSourceUrl">Listing URL or post link (optional)</label><input id="offerSourceUrl" placeholder="Paste the original listing link, if available"></div>
 <div class="intake-section screening-section" id="offerScreening">
  <div class="intake-section-head"><span class="intake-number">02</span><div><h3>Recruitment journey & risk questions</h3><p>Answer based on what actually happened. Choose “Not sure” rather than guessing.</p></div><div class="intake-progress"><b id="screeningProgressText">0 / 7 complete</b><div class="progress-track"><span id="screeningProgressBar"></span></div></div></div>
  <div class="screening-grid">
