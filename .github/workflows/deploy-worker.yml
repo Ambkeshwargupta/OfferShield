@@ -7,6 +7,7 @@ on:
       - "workers/api.js"
       - "workers/intelligence-core.js"
       - "workers/fraud-patterns.js"
+      - "workers/risk-assessment.js"
       - "workers/schema.sql"
       - "workers/migrations/**"
       - "scripts/ensure-cloudflare-d1.mjs"
