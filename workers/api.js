@@ -972,11 +972,10 @@ async function analyseInternshipUpload(request, env, origin) {
   if (files.reduce((sum,file)=>sum+file.size,0) > 12 * 1024 * 1024) return jsonError("Keep all uploaded files below 12 MB total.",413,origin,"upload_too_large");
   if (!companyName && !messageText && !notes && !files.length) return jsonError("Enter a company name, paste the message or upload evidence.",400,origin,"evidence_required");
   if (reviewPurpose === "new_offer") {
-    const requiredAnswers=["sourceChannel","contactChannel","paymentAsked","paymentMade","selectionProcess","writtenOffer","offerStage"];
-    const missingAnswers=requiredAnswers.filter(key=>!screeningAnswers[key]);
+    const requiredAnswers=["paymentAsked","paymentMade"];
+    const invalidAnswers=requiredAnswers.filter(key=>!["yes","no","unknown"].includes(screeningAnswers[key]));
     if (!companyName) return jsonError("Enter the employer name.",400,origin,"company_required");
-    if (!role) return jsonError("Enter the internship or job role.",400,origin,"role_required");
-    if (missingAnswers.length) return jsonError("Complete the required recruitment questions before starting a new-offer review.",400,origin,"screening_required");
+    if (invalidAnswers.length) return jsonError("Answer the two quick payment questions. Choose “Not sure” when you cannot confirm.",400,origin,"screening_required");
     if (!messageText && !notes && !files.length) return jsonError("Add a recruiter message, offer details or at least one screenshot/document.",400,origin,"evidence_required");
   }
 

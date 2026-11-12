@@ -205,3 +205,24 @@ test("evidence is presented before quick risk questions",()=>{
  assert.ok(p.indexOf("core-fields-row")<p.indexOf("evidenceSectionHeading"));
  assert.ok(p.indexOf("evidenceSectionHeading")<p.indexOf("offerScreening"));
 });
+
+test("company name is the only initially visible required identity field",()=>{
+ const page=html.slice(html.indexOf('<section class="page" id="page-investigate">'),html.indexOf('<section class="page" id="page-community">'));
+ const start=page.indexOf("core-fields-row"),end=page.indexOf("optional-company-details",start),core=page.slice(start,end);
+ assert.match(core,/id="offerCompanyName" required/);assert.doesNotMatch(core,/id="offerRole"/);assert.match(page,/optional-company-details/);
+});
+test("the two quick checks are the only required screening answers and allow Not sure",()=>{
+ assert.match(html,/id="riskPaymentAsked"/);assert.match(html,/id="riskPaymentMade"/);assert.match(html,/data-answer-value="unknown"/);assert.match(html,/Choose an answer for both quick questions/);
+});
+test("offer upload supports drag and drop and individual file removal",()=>{
+ assert.match(html,/id="offerDropZone"/);assert.match(html,/function installOfferDropzone/);assert.match(html,/data-remove-offer-file/);
+});
+test("the result visibly shows verification cards, offer facts and an evidence-derived stage timeline",()=>{
+ const start=html.indexOf("function resultHTML"),end=html.indexOf("function renderOfferFileList",start),renderer=html.slice(start,end);
+ assert.match(renderer,/decisionAtGlanceHtml\+offerSnapshotHtml\+stageTimelineHtml/);assert.match(renderer,/const offerSnapshotHtml/);assert.match(renderer,/const stageTimelineHtml/);
+});
+
+test("risk progress counts a not-sure selection as a completed response",()=>{
+ assert.match(html,/responses selected/);
+ assert.match(html,/\["yes","no","unknown"\]\.includes\(x\.value\)/);
+});

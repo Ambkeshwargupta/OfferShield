@@ -1,12 +1,14 @@
 // Transparent warning-signal scoring. It is not a fraud probability or legal finding.
 // Only explicit evidence/answers add points; missing registry or profile data never does.
 const hasAnswer=value=>["yes","no"].includes(String(value??"").trim().toLowerCase());
+const hasResponse=value=>["yes","no","unknown"].includes(String(value??"").trim().toLowerCase());
 const bandFor=score=>score>=65?"high_alert":score>=40?"elevated":score>=20?"caution":"few_signals";
 export function calculateRiskAssessment({answers={},evidence="",hasFiles=false,reviewPurpose="auto",documentType="unclear",matchedPatterns=[]}={}){
  const past=["past_internship","certificate_review","company_background"].includes(reviewPurpose)||["internship_certificate","experience_letter"].includes(documentType);
- if(past)return{available:false,score:null,band:"not_applicable",coverage:0,answered:0,required:2,breakdown:[],signals:[],note:"This review is for past experience or company background. A new-offer warning score is not appropriate."};
+ if(past)return{available:false,score:null,band:"not_applicable",coverage:0,answered:0,responded:0,required:2,breakdown:[],signals:[],note:"This review is for past experience or company background. A new-offer warning score is not appropriate."};
  const keys=["paymentAsked","paymentMade"];
  const answered=keys.filter(k=>hasAnswer(answers[k])).length;
+ const responded=keys.filter(k=>hasResponse(answers[k])).length;
  const text=String(evidence||"").slice(0,48000);
  const evidenceProvided=text.trim().length>=8||hasFiles;
  const patterns=new Set((Array.isArray(matchedPatterns)?matchedPatterns:[]).map(x=>x&&x.id).filter(Boolean));
@@ -42,5 +44,5 @@ export function calculateRiskAssessment({answers={},evidence="",hasFiles=false,r
  if(/\b(?:pay|transfer|deposit|recharge)\b.{0,55}\b(?:today|immediately|right now|to secure|to reserve)\b/i.test(text))add("pressure",7,"Payment wording appears alongside urgency.");
  const score=canScore?Math.min(100,groups.reduce((sum,g)=>sum+g.points,0)):null;
  const band=score===null?"not_enough_info":bandFor(score);
- return{available:score!==null,score,band,coverage,answered,required:2,breakdown:groups,signals:groups.filter(g=>g.points>0),note:score===null?"Add a message, screenshot or offer document and answer at least one quick check. The unknown option is not treated as a safe answer.":"This 0–100 index shows warning signals detected in the submitted evidence and answers. It is not a probability of fraud, a legal finding or proof of safety."};
+ return{available:score!==null,score,band,coverage,answered,responded,required:2,breakdown:groups,signals:groups.filter(g=>g.points>0),note:score===null?"Add a message, screenshot or offer document and answer at least one quick check. The unknown option is not treated as a safe answer.":"This 0–100 index shows warning signals detected in the submitted evidence and answers. It is not a probability of fraud, a legal finding or proof of safety."};
 }

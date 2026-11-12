@@ -28,3 +28,8 @@ test("past-experience certificates are not assigned a new-offer score",()=>{
  const r=calculateRiskAssessment({answers:good,evidence:"Internship completion certificate",reviewPurpose:"certificate_review",documentType:"internship_certificate"});
  assert.equal(r.available,false);assert.equal(r.band,"not_applicable");
 });
+
+test("unknown answers count as selected responses but do not increase known-answer coverage",()=>{
+ const r=calculateRiskAssessment({answers:{paymentAsked:"unknown",paymentMade:"unknown"},evidence:"A role, joining date and stipend appear in the offer."});
+ assert.equal(r.responded,2);assert.equal(r.answered,0);assert.equal(r.available,false);assert.equal(r.coverage,45);
+});

@@ -353,6 +353,9 @@ test("AI internship review parses uploaded files and separates claimed stages fr
   };
   const form=new FormData();
   form.set("companyName","Example Startup");
+  form.set("reviewPurpose","new_offer");
+  form.set("paymentAsked","unknown");
+  form.set("paymentMade","no");
   form.set("recruiterName","Alex Recruiter");
   form.set("recruiterEmail","alex@example-startup.in");
   form.set("state","Madhya Pradesh");
@@ -388,6 +391,8 @@ test("AI internship review parses uploaded files and separates claimed stages fr
   assert.match(modelInput,/Alex Recruiter/);
   assert.match(modelInput,/alex@example-startup\.in/);
   assert.equal(body.aiEnabled,true);
+  assert.equal(body.riskAssessment.responded,2);
+  assert.equal(body.riskAssessment.required,2);
   assert.equal(body.verdict,"caution");
   assert.deepEqual(body.recruitmentStages.explicitStages,["Coding task","Two interviews"]);
   assert.equal(body.recruitmentStages.stagesFoundInProvidedEvidence,true);
@@ -631,4 +636,10 @@ test("Tavily web search is disabled cleanly when no secret is configured",async(
   assert.equal(response.status,200);
   assert.equal(body.digitalFootprint.configured,false);
   assert.equal(body.digitalFootprint.presence,"not_searched");
+});
+
+test("new-offer review rejects missing quick answers and does not require a typed role",async()=>{
+ const form=new FormData();form.set("companyName","Example Startup");form.set("reviewPurpose","new_offer");form.set("messageText","Please review this internship offer.");form.set("paymentAsked","unknown");
+ const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/investigate",{method:"POST",body:form}),env({AI:{async run(){throw new Error("AI must not run before validation")}}}),ctx);
+ const body=await response.json();assert.equal(response.status,400);assert.equal(body.error.code,"screening_required");
 });
