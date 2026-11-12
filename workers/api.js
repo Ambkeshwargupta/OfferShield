@@ -1,7 +1,8 @@
 import {
   cleanText, normalizeDomain, classifyIdentifier, normalizeOgdRecord,
-  resolveCompanyCandidates, parseEmailHeaders, compareDomains
+  resolveCompanyCandidates, parseEmailHeaders, compareDomains, normalizeIndianState, normalizeIndianDistrict
 } from "./intelligence-core.js";
+import { evaluateFraudPatterns } from "./fraud-patterns.js";
 
 const DEFAULT_OGD_RESOURCE = "4dbe5667-7b6b-41d7-82af-211562424d9a";
 const ALLOWED_ORIGINS = new Set([
@@ -147,8 +148,8 @@ function normalizeUdyamRecord(record = {}) {
 }
 
 async function udyamLookup(env, stateValue, districtValue, searchValue = "", limitValue = 50, offsetValue = 0) {
-  const state = cleanText(stateValue, 100).trim();
-  const district = cleanText(districtValue, 100).trim();
+  const state = normalizeIndianState(cleanText(stateValue, 100).trim());
+  const district = normalizeIndianDistrict(cleanText(districtValue, 100).trim(),state);
   if (!state || !district) {
     return { configured: !!env.DATA_GOV_API_KEY, records: [], error: { code:"state_district_required", message:"State and District are mandatory filters for this Udyam resource." } };
   }
@@ -946,8 +947,8 @@ async function analyseInternshipUpload(request, env, origin) {
   const recruiterName = cleanText(form.get("recruiterName"),120).trim();
   const recruiterEmail = cleanText(form.get("recruiterEmail"),180).trim();
   const jobSourceUrl = cleanText(form.get("jobSourceUrl"),500).trim();
-  const companyState = cleanText(form.get("state"),100).trim();
-  const companyDistrict = cleanText(form.get("district"),100).trim();
+  const companyState = normalizeIndianState(cleanText(form.get("state"),100).trim());
+  const companyDistrict = normalizeIndianDistrict(cleanText(form.get("district"),100).trim(),companyState);
   const requestedReviewPurpose = cleanText(form.get("reviewPurpose"),40).trim();
   const reviewPurpose = ["auto","new_offer","past_internship","certificate_review","company_background"].includes(requestedReviewPurpose)?requestedReviewPurpose:"auto";
   const messageText = cleanText(form.get("messageText"),30000).trim();
@@ -1004,6 +1005,7 @@ async function analyseInternshipUpload(request, env, origin) {
   ].filter(Boolean).join("\n\n").slice(0,48000);
   const modelDocumentType = "unclear";
   const detectedDocumentType = detectEvidenceDocumentType(fileInfo,evidence,modelDocumentType);
+  const fraudCaseIntelligence = evaluateFraudPatterns(evidence,companyName);
 
   const emailMatches = [...new Set([
     ...(evidence.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []),
@@ -1114,7 +1116,8 @@ async function analyseInternshipUpload(request, env, origin) {
     "Identify payment requests, deposits, unrealistic stipends, pressure tactics, unusual links, consumer email providers, vague responsibilities and missing written terms. Context matters; one signal alone is not proof of fraud.",
     "Pasted email headers are unverified text. SPF/DKIM/DMARC strings parsed from Authentication-Results are claims in the submitted header, not cryptographic verification by OfferShield; original mailbox headers may be altered before submission.",
     "Community Recruitment Intelligence, when supplied, is opt-in, structured, anonymised, self-reported and approved by moderation. It is aggregated only after at least three reports; it is not company-confirmed hiring policy and not proof of misconduct. Treat it as weak corroborative context, mention its sample count/window, and never repeat personal data or frame a pattern as a verified accusation.",
-    "Use only supplied evidence, MCA/Udyam data, domain data, Community Intelligence aggregates and the digitalFootprint search results. Do not claim direct LinkedIn account verification or access to private LinkedIn data. Keep the final explanation plain-language, structured around company identity, digital footprint, recruiter/email consistency, document type, specific offer risks and next steps. Make it understandable to a student."
+    "Use only supplied evidence, MCA/Udyam data, domain data, Community Intelligence aggregates and the digitalFootprint search results. Do not claim direct LinkedIn account verification or access to private LinkedIn data. Keep the final explanation plain-language, structured around company identity, digital footprint, recruiter/email consistency, document type, specific offer risks and next steps. Make it understandable to a student.",
+    "FRAUD-PATTERN REFERENCE: fraudCaseIntelligence is a curated public-report sample and deterministic text-pattern match, not a complete national database or a list of convictions. Companies in comparablePublicCases may be unrelated to the company being reviewed. Never imply that another named company is the same entity as the one being checked. Exact-name matches are leads requiring legal-entity and location resolution. Media reports, complaints, FIRs and arrests are not convictions. A pattern match is not proof of fraud and must not by itself increase the verdict. No pattern match does not prove safety."
   ].join(" ");
   let udyamRecords = [];
   let udyamSearch = { available:false, pagesChecked:0, note:"Add both State and District to check the Udyam registered-units dataset." };
@@ -1190,7 +1193,7 @@ async function analyseInternshipUpload(request, env, origin) {
     extractedEmails:emailMatches,extractedUrls:urls,extractedCINs:cins,extractedGSTINs:gstins,
     emailHeaderAnalysis,emailDomainComparison,
     paymentLanguage:paymentLines,mcaRecords,mcaSearch,udyamRecords,udyamSearch,publicDiscovery,officialPublicContacts,
-    communityIntelligence,
+    communityIntelligence,fraudCaseIntelligence,
     domainChecks:domainChecks.map(x=>({
       domain:x.domain,emailSecurity:x.emailSecurity,
       registration:x.registration ? {ldhName:x.registration.ldhName,status:x.registration.status,events:x.registration.events,registrar:x.registration.registrar} : null
@@ -1294,6 +1297,7 @@ async function analyseInternshipUpload(request, env, origin) {
     digitalFootprint,
     company:{claimedName:company,mcaMatches:mcaRecords,mcaSearch,udyamMatches:udyamRecords,udyamSearch,publicDiscovery,officialPublicContacts},
     communityIntelligence,
+    fraudCaseIntelligence,
     offer:{role:roleName,stipend:cleanText(analysis.stipend,120),duration:cleanText(analysis.duration,120),workModeAndLocation:cleanText(analysis.workModeAndLocation,180)},
     recruitmentStages:{
       explicitStages:Array.isArray(analysis.explicitRecruitmentStages)?analysis.explicitRecruitmentStages.slice(0,10):[],
@@ -1335,7 +1339,7 @@ async function route(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/health" || url.pathname === "/v1/health") {
     const communityReady = await communitySchemaConfigured(env);
-    return response({ ok:true, service:"OfferShield Intelligence API", version:"1.4.0", officialOgdConfigured:!!env.DATA_GOV_API_KEY, webSearchConfigured:!!env.TAVILY_API_KEY, d1Configured:!!env.DB, communityIntelligenceConfigured:communityReady, companyIndexConfigured:!!env.COMPANY_INDEX, aiConfigured:!!env.AI, documentConversionConfigured:!!(env.AI && typeof env.AI.toMarkdown === "function"), checkedAt:new Date().toISOString() },200,origin);
+    return response({ ok:true, service:"OfferShield Intelligence API", version:"1.5.0", officialOgdConfigured:!!env.DATA_GOV_API_KEY, webSearchConfigured:!!env.TAVILY_API_KEY, d1Configured:!!env.DB, communityIntelligenceConfigured:communityReady, companyIndexConfigured:!!env.COMPANY_INDEX, aiConfigured:!!env.AI, documentConversionConfigured:!!(env.AI && typeof env.AI.toMarkdown === "function"), checkedAt:new Date().toISOString() },200,origin);
   }
   if (!url.pathname.startsWith("/v1/")) return jsonError("Route not found.",404,origin,"not_found");
   if (!await rateLimit(request,env)) return jsonError("Rate limit reached. Please retry in one minute.",429,origin,"rate_limited");

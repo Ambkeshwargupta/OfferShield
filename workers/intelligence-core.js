@@ -5,6 +5,13 @@ export function cleanText(value, max = 30000) {
     .slice(0, max);
 }
 
+
+const INDIAN_STATE_ALIASES=new Map([
+["mp","Madhya Pradesh"],["m p","Madhya Pradesh"],["madhya pradesh","Madhya Pradesh"],["mh","Maharashtra"],["maharashtra","Maharashtra"],["up","Uttar Pradesh"],["u p","Uttar Pradesh"],["uttar pradesh","Uttar Pradesh"],["rj","Rajasthan"],["gj","Gujarat"],["guj","Gujarat"],["ka","Karnataka"],["kar","Karnataka"],["ts","Telangana"],["tg","Telangana"],["ap","Andhra Pradesh"],["tn","Tamil Nadu"],["wb","West Bengal"],["br","Bihar"],["or","Odisha"],["od","Odisha"],["pb","Punjab"],["hr","Haryana"],["cg","Chhattisgarh"],["jh","Jharkhand"],["uk","Uttarakhand"],["ut","Uttarakhand"],["hp","Himachal Pradesh"],["ga","Goa"],["as","Assam"],["kl","Kerala"],["mn","Manipur"],["ml","Meghalaya"],["mz","Mizoram"],["nl","Nagaland"],["sk","Sikkim"],["tr","Tripura"],["ar","Arunachal Pradesh"],["dl","Delhi"],["nct","Delhi"],["jk","Jammu and Kashmir"],["j&k","Jammu and Kashmir"],["la","Ladakh"],["ch","Chandigarh"],["py","Puducherry"],["pondicherry","Puducherry"],["an","Andaman and Nicobar Islands"],["ld","Lakshadweep"]]);
+export function normalizeIndianState(value){const raw=String(value??"").trim();if(!raw)return "";const key=raw.toLowerCase().replace(/[.]/g,"").replace(/\s+/g," ").trim();return INDIAN_STATE_ALIASES.get(key)||raw}
+const INDIAN_DISTRICT_ALIASES=new Map([["bangalore","Bengaluru Urban"],["bengaluru","Bengaluru Urban"],["bangalore urban","Bengaluru Urban"],["gurgaon","Gurugram"],["allahabad","Prayagraj"],["poona","Pune"],["calcutta","Kolkata"],["trivandrum","Thiruvananthapuram"],["mysore","Mysuru"],["baroda","Vadodara"],["cochin","Ernakulam"],["bombay","Mumbai"],["new delhi","Delhi"]]);
+export function normalizeIndianDistrict(value,state=""){const raw=String(value??"").trim();if(!raw)return "";const key=raw.toLowerCase().replace(/[.]/g,"").replace(/\s+/g," ").trim();return INDIAN_DISTRICT_ALIASES.get(key)||raw}
+
 export function normalizeDomain(value) {
   const raw = String(value ?? "").trim().toLowerCase();
   if (!raw) return null;

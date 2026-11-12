@@ -55,6 +55,13 @@ OfferShield is an India-first company and recruitment due-diligence platform foc
 - Screenshot/document evidence extraction, domain DNS/RDAP and pasted email-header clues, MCA indexed-name/CIN lookup, regional Udyam enterprise discovery and Wikidata candidates, plus structured student-facing assessment and, when D1 is configured, company-published verification contact cross-checks.
 - D1-backed API response cache and rate limit buckets when D1 is configured.
 
+### Public internship-fraud pattern intelligence
+
+- OfferShield now includes a curated, source-linked public-case reference covering reported internship deposits, unpaid stipends, recruiter impersonation, false offer documents and adjacent fresher-job / task scams.
+- Deterministic evidence-pattern checks run with the AI review. Relevant case summaries and source links are provided as retrieval context; named-entity matches are separated from unrelated examples with similar tactics.
+- This is retrieval-augmented context and rule-based matching, not model-weight fine-tuning. A pattern match is a prompt for further checking, not a verdict; a missing match is not proof of safety.
+- The corpus is non-exhaustive. The Ministry of Home Affairs has stated that central data on websites advertising internship schemes is not maintained and police / public order are State subjects.
+
 ## Run the Node prototype locally
 
 Requirements: Node.js 20 or later.

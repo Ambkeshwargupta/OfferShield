@@ -72,3 +72,20 @@ These are source links and curated reference statements. Recheck the company sou
 ## Attribution
 
 Where the MCA company master dataset is displayed, cite: “Contains Ministry of Corporate Affairs Company Master Data published through the Open Government Data Platform India under the Government Open Data License – India. MCA and the OGD Platform do not endorse OfferShield.”
+
+
+## Internship and recruitment fraud research
+
+The current curated source-linked retrieval corpus is in `workers/fraud-patterns.js` (snapshot: 12 November 2026). It distinguishes direct internship complaints from adjacent fresher-job, impersonation and task-job cases. Each entry records a public source and reporting status. Complaints, FIRs and arrests are not treated as convictions.
+
+| Reported case / pattern | Source and date | What was reported |
+|---|---|---|
+| ThynkTech India, Pune | The Indian Express, 3–4 June 2026 | Laptop-deposit, stipend and equipment-return allegations; police case / arrest reported. |
+| Algodealer.ai, Ahmedabad | The Times of India, 8 August 2026 | Student allegations about refundable internship deposits and unpaid stipend; students reportedly approached police. |
+| Unnamed Bengaluru online internship campaigns | The Times of India, 19 June 2025 | Social-group funnels, small fees and unclear work reported by students. |
+| Pune IT recruitment-fee cases | The Indian Express, 4 June 2026 | Adjacent job-recruitment allegations involving agents and unpaid dues. |
+| Neogen Soft Tech Solutions, Hyderabad | Hyderabad Police, 17 February 2025 | Police-described fake-company, job-payment and false-offer case. |
+| Prasar Bharati impersonation racket | Delhi Police EOW, 21 April 2023 | Fake recruitment emails / vacancy communications and candidate-payment allegations. |
+| WhatsApp / Telegram task-job pattern | Directorate of Enforcement, 28 March 2024 | Official investigation release describing task-job approaches and money-transfer mechanics. |
+
+Coverage is not exhaustive: the Ministry of Home Affairs told the Lok Sabha on 3 March 2020 that central data on websites advertising internship schemes was not maintained and police / public order are State subjects. A similar tactic does not mean that the company under review is involved in a named case. Exact legal-entity matching and independent evidence are required.
