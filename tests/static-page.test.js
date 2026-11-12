@@ -132,3 +132,15 @@ test("navigation and hero actions have a capture-phase click fallback", () => {
   assert.match(goSource, /\$\$\("\.page"\)\.forEach/);
   assert.match(goSource, /\$\$\("\.nav button"\)\.forEach/);
 });
+
+test("new-offer review requires key recruitment facts and actual offer evidence",()=>{
+  for(const id of ["riskSourceChannel","riskContactChannel","riskPaymentAsked","riskSelectionProcess","riskWrittenOffer","riskOfferStage"]) assert.match(html,new RegExp('id="'+id+'" data-risk-required'));
+  assert.match(html,/Complete the six required risk questions/);
+  assert.match(html,/Add the recruiter message, offer details or at least one screenshot\/document/);
+});
+test("new-offer results start with a visual warning-signal donut and category breakdown",()=>{
+  assert.match(html,/riskDashboardHtml/);assert.match(html,/risk-donut/);assert.match(html,/risk-breakdown/);assert.match(html,/not a probability of fraud/i);
+});
+test("investigation page uses a visual hero, workflow stepper and progressive intake",()=>{
+  assert.match(html,/verify-hero/);assert.match(html,/workflow-strip/);assert.match(html,/START A NEW REVIEW/);assert.match(html,/updateScreeningProgress/);
+});
