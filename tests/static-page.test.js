@@ -183,3 +183,10 @@ test("the application starts in new-offer mode but supports certificate and back
   assert.match(html,/value="certificate_review"/);
   assert.match(html,/value="company_background"/);
 });
+
+test("risk donut uses a browser-safe angle and separates AI verdict from warning score",()=>{
+  assert.match(html,/--risk-angle:/);
+  assert.match(html,/conic-gradient\(var\(--risk-color\) var\(--risk-angle\)/);
+  assert.match(html,/Separate AI evidence review:/);
+  assert.doesNotMatch(html,/risk-badge\.safe/);
+});
