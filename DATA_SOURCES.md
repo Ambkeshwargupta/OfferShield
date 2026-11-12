@@ -89,3 +89,20 @@ The current curated source-linked retrieval corpus is in `workers/fraud-patterns
 | WhatsApp / Telegram task-job pattern | Directorate of Enforcement, 28 March 2024 | Official investigation release describing task-job approaches and money-transfer mechanics. |
 
 Coverage is not exhaustive: the Ministry of Home Affairs told the Lok Sabha on 3 March 2020 that central data on websites advertising internship schemes was not maintained and police / public order are State subjects. A similar tactic does not mean that the company under review is involved in a named case. Exact legal-entity matching and independent evidence are required.
+
+
+### Additional public reporting added on 12 November 2026
+
+The source-linked additions are stored in `workers/fraud-patterns.js`. Adjacent job-recruitment reports are included because similar payment, fake-offer, impersonation and non-payment tactics also occur in internship offers. They are labelled as job cases rather than internship cases.
+
+| Case / pattern | Source | How the product labels it |
+|---|---|---|
+| Flynaut SaaS Private Limited | The Free Press Journal (24 Aug 2025), The Indian Express (4 Jun 2026), Moneycontrol (31 Mar 2026) | Multiple FIR / arrest reporting and later public reporting; allegations, not a conviction. |
+| Data Tech Labs | The Indian Express (4 Jun 2026), Moneycontrol (31 Mar 2026) | FIR and complainant allegations; later report described partial salary clearances and continuing dues. |
+| Quantumsoft Technologies Private Limited | The Indian Express (4 Jun 2026), Moneycontrol (31 Mar 2026) | FIR and arrest reporting; alleged consultant payment and unpaid salary claims. |
+| Accure Softech Private Limited | The Indian Express (4 Jun 2026) | FIR and directors' arrest reporting; alleged job fee and unpaid training stipend / salary. |
+| Unidentified Indore data-entry recruitment operation | The Times of India (5 Jul 2026) | FIR reported after a student allegedly lost about ₹44,000 through repeated recruitment-process payments. Job case, not internship-specific. |
+| Fake Indian Army internship email | The Times of India (15 Aug 2026) | Maharashtra cyber-police phishing warning about an impersonated internship offering ₹75,000/month; sender unidentified. |
+| Additional firms named in FITE's representation | Hindustan Times (7 Jun 2026), Moneycontrol (June 2026) | Manual research lead only; not used for individual exact-name matches because separate case details were not supplied for every name. |
+
+The research remains a source-linked sample, not an exhaustive national database. The Ministry of Home Affairs' 3 March 2020 Lok Sabha answer explicitly said that central data on websites advertising internship schemes was not maintained and that police / public order are State subjects.

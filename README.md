@@ -59,7 +59,7 @@ OfferShield is an India-first company and recruitment due-diligence platform foc
 
 - OfferShield now includes a curated, source-linked public-case reference covering reported internship deposits, unpaid stipends, recruiter impersonation, false offer documents and adjacent fresher-job / task scams.
 - Deterministic evidence-pattern checks run with the AI review. Relevant case summaries and source links are provided as retrieval context; named-entity matches are separated from unrelated examples with similar tactics.
-- This is retrieval-augmented context and rule-based matching, not model-weight fine-tuning. A pattern match is a prompt for further checking, not a verdict; a missing match is not proof of safety.
+- The 12 November 2026 expanded corpus now includes public reports on ThynkTech, Algodealer.ai, Flynaut SaaS, Data Tech Labs, Quantumsoft Technologies and Accure Softech, plus unidentified Indore data-entry and fake Indian Army internship-email warnings. Additional FITE-reported company names are retained as unverified research leads and are not exact-name matches. This is retrieval-augmented context and rule-based matching, not model-weight fine-tuning. A pattern match is a prompt for further checking, not a verdict; a missing match is not proof of safety.
 - The corpus is non-exhaustive. The Ministry of Home Affairs has stated that central data on websites advertising internship schemes is not maintained and police / public order are State subjects.
 
 ## Run the Node prototype locally
