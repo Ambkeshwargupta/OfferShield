@@ -21,7 +21,7 @@ test("an exact name match is kept distinct from unrelated comparable cases",()=>
 });
 test("task-rating signals require a recharge or wallet payment mechanic",()=>{
  const a=evaluateFraudPatterns("Rate five products and write a review.","");
- const b=evaluateFraudPatterns("Rate products on Telegram and recharge your wallet to withdraw earnings.","");
+ const b=evaluateFraudPatterns("Rate products as Telegram tasks and recharge your wallet to withdraw earnings.","");
  assert.equal(a.matchedPatterns.some(x=>x.id==="task_recharge_or_deposit_escalation"),false);
  assert.equal(b.matchedPatterns.some(x=>x.id==="task_recharge_or_deposit_escalation"),true);
 });
