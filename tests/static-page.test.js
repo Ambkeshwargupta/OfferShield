@@ -41,11 +41,12 @@ test("public digital footprint report displays indexed LinkedIn, history, jobs a
   assert.match(html, /recruiterEmailEvidence/);
 });
 
-test("investigation results show three plain-language evidence layers", () => {
-  assert.match(html, /At a glance · three separate checks/);
-  assert.match(html, /Government identity/);
-  assert.match(html, /Digital footprint/);
-  assert.match(html, /Submitted evidence/);
+test("investigation results show three visual verification layers", () => {
+  assert.match(html, /THREE-LAYER VERIFICATION/);
+  assert.match(html, /LEGAL IDENTITY/);
+  assert.match(html, /DIGITAL FOOTPRINT/);
+  assert.match(html, /OFFER EVIDENCE/);
+  assert.match(html, /decisionAtGlanceHtml\+offerSnapshotHtml\+stageTimelineHtml/);
 });
 
 test("public footprint section separates ecosystem partner signals from company history", () => {

@@ -640,6 +640,6 @@ test("Tavily web search is disabled cleanly when no secret is configured",async(
 
 test("new-offer review rejects missing quick answers and does not require a typed role",async()=>{
  const form=new FormData();form.set("companyName","Example Startup");form.set("reviewPurpose","new_offer");form.set("messageText","Please review this internship offer.");form.set("paymentAsked","unknown");
- const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/investigate",{method:"POST",body:form}),env({AI:{async run(){throw new Error("AI must not run before validation")}}}),ctx);
+ const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/investigate",{method:"POST",body:form}),env({AI:{async toMarkdown(){return[]},async run(){throw new Error("AI must not run before validation")}}}),ctx);
  const body=await response.json();assert.equal(response.status,400);assert.equal(body.error.code,"screening_required");
 });
