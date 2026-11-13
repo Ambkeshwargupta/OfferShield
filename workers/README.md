@@ -265,3 +265,8 @@ Do not attempt to import the complete national dataset into D1 Free. D1 has a 50
 ### Important scope
 
 The MCA master-data resource covers company and LLP master records in its published snapshot. It does not contain every informal business, every brand/alias, directors, filings, financial statements, recruiter employment, vacancies or offer authority. Udyam will be integrated separately after MCA ingestion is validated. A government registry record is evidence of an entry in a dated dataset snapshot, not proof that a particular job offer is genuine.
+
+
+## National MCA data index
+
+The full nationwide MCA OGD snapshot is stored in Cloudflare R2 rather than Git. See [MCA data coverage and refresh operations](../docs/MCA_DATA_COVERAGE.md). The Worker endpoint `GET /v1/mca/index-status` reports the actual published record count and source timestamp; an R2 binding alone does not mean that the index is populated.

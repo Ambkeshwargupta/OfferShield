@@ -115,7 +115,7 @@ async function fetchPage(offset, limit, apiKey) {
       if (!Array.isArray(records)) throw new Error("OGD response did not contain a records array. Check the resource ID and API key.");
       return {
         records,
-        total: Number(payload.total || payload.count || 0),
+        total: Number(payload.total ?? payload.totalRecords ?? payload.total_records ?? 0),
         updatedAt: payload.updated_date || payload.updated_on || null
       };
     }
@@ -170,6 +170,9 @@ async function main() {
   while (downloaded < maxRecords && (!total || offset < total)) {
     const requested = Math.min(pageSize, Number.isFinite(maxRecords) ? maxRecords - downloaded : pageSize);
     const page = await fetchPage(offset, requested, apiKey);
+    if (sourceUpdatedAt && page.updatedAt && page.updatedAt !== sourceUpdatedAt) {
+      throw new Error("The official MCA source update timestamp changed during this resumed import. Refusing to mix records from different snapshots; preserve the published index and start a fresh ingestion checkpoint.");
+    }
     if (total && page.total && page.total !== total) {
       throw new Error("The reported MCA dataset total changed during this resumed import. Refusing to combine pages from different source snapshots; preserve the existing published index and start a fresh ingestion checkpoint.");
     }

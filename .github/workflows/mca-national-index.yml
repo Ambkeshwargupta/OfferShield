@@ -4,15 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       max_records:
-        description: "Use 1000 for a staging test; use 0 to resume and publish the complete MCA snapshot"
+        description: "Use 1000 for an isolated staging test; use 0 to resume and publish the complete MCA snapshot"
         required: true
         default: "0"
         type: string
       reset_import:
-        description: "Start a fresh MCA snapshot by deleting only persisted ingestion pages and checkpoint (keeps the live index)"
+        description: "Start a fresh source snapshot. The currently published index remains live until the new index passes validation."
         required: false
         default: false
         type: boolean
+  schedule:
+    - cron: "30 3 1 * *"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/mca-refresh-index.flag"
 
 permissions:
   contents: read
@@ -33,6 +39,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto
       R2_BUCKET_NAME: offershield-company-index
+      # Push/scheduled refreshes always ingest a fresh full snapshot. Manual runs
+      # can resume a checkpoint or explicitly request a fresh snapshot.
+      MAX_RECORDS: ${{ inputs.max_records || '0' }}
+      RESET_IMPORT: ${{ github.event_name == 'push' || github.event_name == 'schedule' || inputs.reset_import || inputs.max_records != '0' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -42,8 +52,6 @@ jobs:
 
       - name: Validate credentials and dedicated R2 bucket
         shell: bash
-        env:
-          MAX_RECORDS: ${{ inputs.max_records }}
         run: |
           set -euo pipefail
           for name in DATA_GOV_API_KEY CLOUDFLARE_ACCOUNT_ID AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
@@ -66,10 +74,11 @@ jobs:
             --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com"
           echo "R2 bucket is reachable. Raw ingestion and published index use separate prefixes."
 
+      - name: Verify the official MCA OGD source before changing ingestion state
+        run: node scripts/mca-api-check.mjs
+
       - name: Restore persistent MCA checkpoint
         shell: bash
-        env:
-          RESET_IMPORT: ${{ inputs.reset_import }}
         run: |
           set -euo pipefail
           mkdir -p .data/mca/pages
@@ -191,6 +200,46 @@ jobs:
           npm install --global wrangler@latest
           printf '%s' "$DATA_GOV_API_KEY" | wrangler secret put DATA_GOV_API_KEY --config workers/wrangler.toml
           wrangler deploy --config workers/wrangler.toml
+
+      - name: Verify the published R2 national index through the live Worker
+        if: env.MAX_RECORDS == '0'
+        shell: bash
+        env:
+          WORKER_URL: https://offershield-intelligence.official-ambkeshwargupta.workers.dev
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            import { readFile } from "node:fs/promises";
+            const checkpoint = JSON.parse(await readFile(".data/mca/r2-checkpoint.json", "utf8"));
+            const manifest = JSON.parse(await readFile(".data/mca/r2-index/index-manifest.json", "utf8"));
+            const expected = {
+              importedCompanies:checkpoint.usableRecords,
+              totalSourceRecords:checkpoint.totalRecords,
+              sourceUpdatedAt:checkpoint.sourceUpdatedAt
+            };
+            let status = null;
+            for (let attempt=0; attempt<12; attempt++) {
+              try {
+                const response = await fetch(process.env.WORKER_URL + "/v1/mca/index-status", {headers:{accept:"application/json"}});
+                status = await response.json();
+                if (response.ok && status.complete &&
+                    status.importedCompanies === expected.importedCompanies &&
+                    status.totalSourceRecords === expected.totalSourceRecords &&
+                    status.sourceUpdatedAt === expected.sourceUpdatedAt) break;
+              } catch {}
+              await new Promise(resolve=>setTimeout(resolve,5000));
+            }
+            console.log(JSON.stringify({expected, published:status},null,2));
+            if (!status?.complete ||
+                status.importedCompanies !== expected.importedCompanies ||
+                status.totalSourceRecords !== expected.totalSourceRecords ||
+                status.sourceUpdatedAt !== expected.sourceUpdatedAt) {
+              throw new Error("The Worker does not yet expose the complete, matching national MCA index.");
+            }
+            if (manifest.importedCompanies !== expected.importedCompanies) {
+              throw new Error("Local index manifest differs from the downloaded source checkpoint.");
+            }
+          '
 
       - name: Report import result
         run: |

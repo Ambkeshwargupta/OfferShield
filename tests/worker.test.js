@@ -6,6 +6,43 @@ import { gzipSync } from "node:zlib";
 function env(overrides={}) { return { ...overrides }; }
 const ctx={waitUntil(){}};
 
+test("MCA index status distinguishes an R2 binding from a published national dataset",async()=>{
+ const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/mca/index-status"),env({COMPANY_INDEX:{async get(){return null}}}),ctx);
+ const body=await response.json();
+ assert.equal(response.status,200);
+ assert.equal(body.configured,true);
+ assert.equal(body.published,false);
+ assert.equal(body.complete,false);
+});
+test("MCA index status reports the published source date and verifies row-count parity",async()=>{
+ const manifest={
+  version:2,resourceId:"4dbe5667-7b6b-41d7-82af-211562424d9a",
+  source:"Ministry of Corporate Affairs via Open Government Data Platform India",
+  sourceUrl:"https://www.data.gov.in/catalog/company-master-data",
+  sourceUpdatedAt:"2026-10-13",generatedAt:"2026-11-13T00:00:00.000Z",
+  importedCompanies:3738721,skippedRows:0,tokenPostings:9200000,
+  uniqueTokens:110000,shardCount:120000,tokenManifestCount:110000
+ };
+ const checkpoint={
+  resourceId:manifest.resourceId,sourceUpdatedAt:manifest.sourceUpdatedAt,
+  totalRecords:3738721,downloadedRecords:3738721,usableRecords:3738721,complete:true
+ };
+ const objects={
+  "index/index-manifest.json":manifest,
+  "ingestion/mca/checkpoint.json":checkpoint
+ };
+ const bucket={async get(key){return objects[key]?{async text(){return JSON.stringify(objects[key])}}:null}};
+ const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/mca/index-status"),env({COMPANY_INDEX:bucket}),ctx);
+ const body=await response.json();
+ assert.equal(response.status,200);
+ assert.equal(body.published,true);
+ assert.equal(body.complete,true);
+ assert.equal(body.importedCompanies,3738721);
+ assert.equal(body.downloadedRecords,3738721);
+ assert.equal(body.totalSourceRecords,3738721);
+ assert.equal(body.sourceUpdatedAt,"2026-10-13");
+ assert.equal(body.indexMatchesCheckpoint,true);
+});
 test("health endpoint describes configuration without exposing secrets", async()=>{
   const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/health"),env({DATA_GOV_API_KEY:"secret-value"}),ctx);
   const body=await response.json();

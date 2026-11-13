@@ -92,7 +92,7 @@ async function fetchPage(offset, limit, apiKey) {
       const payload = await response.json();
       const records = payload.records || payload.data;
       if (!Array.isArray(records)) throw new Error("OGD response did not contain a records array. Check the resource ID and API key.");
-      return { records, total: Number(payload.total || 0), updatedAt: payload.updated_date || payload.updated_on || null };
+      return { records, total: Number(payload.total ?? payload.totalRecords ?? payload.total_records ?? 0), updatedAt: payload.updated_date || payload.updated_on || null };
     }
     const body = await response.text().catch(() => "");
     if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 4) {
@@ -137,6 +137,7 @@ async function main() {
     while (pages < maxPages && downloaded < maxRecords) {
       const limit = Math.min(pageSize, Number.isFinite(maxRecords) ? maxRecords - downloaded : pageSize);
       const page = await fetchPage(offset, limit, apiKey);
+      if (total && page.total && page.total !== total) throw new Error("The reported MCA dataset total changed during this import. Start a fresh snapshot rather than combining pages.");
       if (!total && page.total) total = page.total;
       if (page.records.length === 0) break;
       const lines = page.records.map(row => normalize(row, page.updatedAt)).filter(Boolean);

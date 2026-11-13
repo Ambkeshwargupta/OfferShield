@@ -14,6 +14,63 @@ const ALLOWED_ORIGINS = new Set([
 const MAX_SEARCH = 120;
 const DEFAULT_TTL = 86400;
 
+async function readBucketJson(bucket, key) {
+  try {
+    const object = await bucket.get(key);
+    if (!object) return null;
+    return JSON.parse(await object.text());
+  } catch {
+    return null;
+  }
+}
+
+async function getMcaIndexStatus(env) {
+  if (!env.COMPANY_INDEX) {
+    return {
+      configured:false, published:false, complete:false,
+      note:"The Cloudflare R2 company-index binding is not connected."
+    };
+  }
+  const [manifest, checkpoint] = await Promise.all([
+    readBucketJson(env.COMPANY_INDEX, "index/index-manifest.json"),
+    readBucketJson(env.COMPANY_INDEX, "ingestion/mca/checkpoint.json")
+  ]);
+  const importedCompanies = Number(manifest?.importedCompanies || 0);
+  const usableRecords = Number(checkpoint?.usableRecords || 0);
+  const downloadedRecords = Number(checkpoint?.downloadedRecords || 0);
+  const totalRecords = Number(checkpoint?.totalRecords || 0);
+  const indexMatchesCheckpoint = !!manifest && !!checkpoint && importedCompanies === usableRecords;
+  const downloadComplete = checkpoint?.complete === true && totalRecords > 0 && downloadedRecords >= totalRecords;
+  const published = manifest?.version === 2 && importedCompanies > 0 && Number(manifest?.tokenManifestCount || 0) > 0;
+  const complete = published && downloadComplete && indexMatchesCheckpoint;
+  return {
+    configured:true,
+    published,
+    complete,
+    indexVersion:manifest?.version ?? null,
+    source:manifest?.source || checkpoint?.source || "Ministry of Corporate Affairs via Open Government Data Platform India",
+    sourceUrl:manifest?.sourceUrl || "https://www.data.gov.in/catalog/company-master-data",
+    resourceId:manifest?.resourceId || checkpoint?.resourceId || DEFAULT_OGD_RESOURCE,
+    sourceUpdatedAt:manifest?.sourceUpdatedAt || checkpoint?.sourceUpdatedAt || null,
+    generatedAt:manifest?.generatedAt || null,
+    importedCompanies,
+    usableSourceRecords:usableRecords,
+    downloadedRecords,
+    totalSourceRecords:totalRecords,
+    skippedRows:Number(manifest?.skippedRows || 0),
+    uniqueTokens:Number(manifest?.uniqueTokens || 0),
+    tokenPostings:Number(manifest?.tokenPostings || 0),
+    shardCount:Number(manifest?.shardCount || 0),
+    tokenManifestCount:Number(manifest?.tokenManifestCount || 0),
+    indexMatchesCheckpoint,
+    note:complete
+      ? "A complete source snapshot is downloaded and the published R2 token index matches the imported row count. This remains a periodic government-data snapshot, not a live MCA status check."
+      : published
+        ? "A published index exists, but its ingestion checkpoint is missing, incomplete or does not match the indexed row count."
+        : "The R2 binding exists, but a complete national MCA index has not yet been published."
+  };
+}
+
 function response(data, status = 200, origin = "*") {
   return new Response(JSON.stringify(data), {
     status,
@@ -1367,9 +1424,12 @@ async function route(request, env) {
   if (origin === null) return jsonError("Origin not allowed.", 403, "null", "origin_not_allowed");
   if (request.method === "OPTIONS") return new Response(null, { status:204, headers:{"access-control-allow-origin":origin,"access-control-allow-methods":"GET,POST,DELETE,OPTIONS","access-control-allow-headers":"content-type","access-control-max-age":"86400","vary":"Origin"} });
   const url = new URL(request.url);
+  if (request.method === "GET" && url.pathname === "/v1/mca/index-status") {
+    return response(await getMcaIndexStatus(env),200,origin);
+  }
   if (url.pathname === "/health" || url.pathname === "/v1/health") {
     const communityReady = await communitySchemaConfigured(env);
-    return response({ ok:true, service:"OfferShield Intelligence API", version:"1.6.0", officialOgdConfigured:!!env.DATA_GOV_API_KEY, webSearchConfigured:!!env.TAVILY_API_KEY, d1Configured:!!env.DB, communityIntelligenceConfigured:communityReady, companyIndexConfigured:!!env.COMPANY_INDEX, aiConfigured:!!env.AI, documentConversionConfigured:!!(env.AI && typeof env.AI.toMarkdown === "function"), checkedAt:new Date().toISOString() },200,origin);
+    return response({ ok:true, service:"OfferShield Intelligence API", version:"1.7.0", officialOgdConfigured:!!env.DATA_GOV_API_KEY, webSearchConfigured:!!env.TAVILY_API_KEY, d1Configured:!!env.DB, communityIntelligenceConfigured:communityReady, companyIndexConfigured:!!env.COMPANY_INDEX, aiConfigured:!!env.AI, documentConversionConfigured:!!(env.AI && typeof env.AI.toMarkdown === "function"), checkedAt:new Date().toISOString() },200,origin);
   }
   if (!url.pathname.startsWith("/v1/")) return jsonError("Route not found.",404,origin,"not_found");
   if (!await rateLimit(request,env)) return jsonError("Rate limit reached. Please retry in one minute.",429,origin,"rate_limited");
