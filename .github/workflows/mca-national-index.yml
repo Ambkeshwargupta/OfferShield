@@ -35,8 +35,6 @@ jobs:
       DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto
       R2_BUCKET_NAME: offershield-company-index
       # Push/scheduled refreshes always ingest a fresh full snapshot. Manual runs
@@ -50,25 +48,38 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
-      - name: Validate credentials and dedicated R2 bucket
+      - name: Validate OGD and Cloudflare credentials
         shell: bash
         run: |
           set -euo pipefail
-          for name in DATA_GOV_API_KEY CLOUDFLARE_ACCOUNT_ID AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+          for name in DATA_GOV_API_KEY CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN; do
             if [ -z "$(printenv "$name" || true)" ]; then
               echo "Missing required GitHub Actions secret: $name"
               exit 1
             fi
           done
+
+      - name: Prepare bucket-scoped R2 S3 credentials
+        id: r2creds
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$(printenv AWS_ACCESS_KEY_ID || true)" ] && [ -n "$(printenv AWS_SECRET_ACCESS_KEY || true)" ]; then
+            echo "Using existing R2 S3 credentials from repository secrets."
+            echo "temporary=false" >> "$GITHUB_OUTPUT"
+          else
+            node scripts/mca-create-r2-token.mjs
+          fi
+
+      - name: Install AWS CLI and verify the R2 bucket
+        shell: bash
+        run: |
+          set -euo pipefail
           if ! command -v aws >/dev/null 2>&1; then
             sudo apt-get update
             sudo apt-get install -y awscli
           fi
           aws --version
-          if [ "$MAX_RECORDS" = "0" ] && [ -z "$(printenv CLOUDFLARE_API_TOKEN || true)" ]; then
-            echo "Missing required GitHub Actions secret for production Worker deployment: CLOUDFLARE_API_TOKEN"
-            exit 1
-          fi
           aws s3api head-bucket \
             --bucket "$R2_BUCKET_NAME" \
             --endpoint-url "https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com"
@@ -99,8 +110,6 @@ jobs:
 
       - name: Download and persist MCA pages to R2
         shell: bash
-        env:
-          MAX_RECORDS: ${{ inputs.max_records }}
         run: |
           set -euo pipefail
           if [ "$MAX_RECORDS" = "0" ]; then
@@ -193,7 +202,7 @@ jobs:
 
 
       - name: Deploy updated intelligence Worker after full publication
-        if: inputs.max_records == '0'
+        if: env.MAX_RECORDS == '0'
         shell: bash
         run: |
           set -euo pipefail
@@ -259,3 +268,9 @@ jobs:
               sourceUpdatedAt:index.sourceUpdatedAt
             }, null, 2));
           '
+
+      - name: Revoke temporary R2 token
+        if: ${{ always() && steps.r2creds.outputs.temporary == 'true' && steps.r2creds.outputs.token_id != '' }}
+        env:
+          R2_TEMP_TOKEN_ID: ${{ steps.r2creds.outputs.token_id }}
+        run: node scripts/mca-revoke-r2-token.mjs
