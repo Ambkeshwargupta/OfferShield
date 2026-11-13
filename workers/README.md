@@ -270,3 +270,8 @@ The MCA master-data resource covers company and LLP master records in its publis
 ## National MCA data index
 
 The full nationwide MCA OGD snapshot is stored in Cloudflare R2 rather than Git. See [MCA data coverage and refresh operations](../docs/MCA_DATA_COVERAGE.md). The Worker endpoint `GET /v1/mca/index-status` reports the actual published record count and source timestamp; an R2 binding alone does not mean that the index is populated.
+
+
+## R2 credentials for the national MCA import
+
+The national index workflow uses a bucket-scoped R2 S3 token. It first attempts to create an eight-hour token using the Cloudflare API token (requires Account API Tokens Read/Write). If that API permission is unavailable, add GitHub Actions repository secrets `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` from an R2 API token scoped to Object Read & Write for the `offershield-company-index` bucket. Never commit or paste these keys. See [MCA_DATA_COVERAGE.md](../docs/MCA_DATA_COVERAGE.md) for setup and import status details.

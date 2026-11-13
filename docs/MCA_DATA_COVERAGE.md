@@ -17,6 +17,21 @@ For each source row with a usable registration identifier and name, OfferShield 
 
 Do not assume every row has every optional field populated. Missing values remain missing. The API's `count` field is a page count and is never used as a substitute for the dataset-wide `total`.
 
+## R2 credentials required for the first import
+
+The import runner first tries to mint a short-lived, bucket-scoped R2 token automatically using the Cloudflare API token in GitHub Actions. This requires **Account API Tokens Read/Write** permission on that Cloudflare token. If Cloudflare denies that endpoint, add the two R2 S3 credentials as GitHub Actions repository secrets:
+
+1. In Cloudflare Dashboard, open **R2 Object Storage → Manage R2 API Tokens → Create API Token**.
+2. Choose **Object Read & Write** and scope it only to the existing `offershield-company-index` bucket. The importer needs to list, read, upload and replace objects within that bucket.
+3. Copy the generated **Access Key ID** and **Secret Access Key**. Do not paste either value into chat, commit them, or put them in workflow YAML.
+4. In GitHub, open **Settings → Secrets and variables → Actions → New repository secret** and create:
+   - `R2_ACCESS_KEY_ID`
+   - `R2_SECRET_ACCESS_KEY`
+
+The workflow uses these two repository secrets when present. If they are absent, it attempts the short-lived token route. Any automatically created token is scoped to this bucket, expires after eight hours and is revoked by the final cleanup step. The API token used for that automatic route must have Cloudflare's Account API Tokens Read/Write permission. See [Cloudflare R2 authentication and bucket permissions](https://developers.cloudflare.com/r2/api/tokens/) and [creating account API tokens](https://developers.cloudflare.com/fundamentals/api/how-to/create-via-api/).
+
+The GitHub Actions run currently stops at the R2 credential preflight until one of those credential paths succeeds. It does **not** delete the currently published `index/` while blocked.
+
 ## Where data lives
 
 - `ingestion/mca/pages/`: compressed, resumable pages from the official OGD snapshot.
