@@ -3,3 +3,5 @@ Request a fresh full national MCA Company Master Data import.
 This file is a one-time GitHub Actions push trigger. The workflow first verifies the official OGD API and required R2 credentials, stores compressed source pages in Cloudflare R2, builds the complete national search index, verifies record-count parity, publishes atomically, deploys the Worker and checks the live index-status endpoint.
 
 The currently published index is not deleted until a complete replacement has been built and validated.
+
+One-time retrigger after adding short-lived, bucket-scoped R2 S3 credentials automation. 2026-11-13.

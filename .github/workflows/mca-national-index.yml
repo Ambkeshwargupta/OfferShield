@@ -152,8 +152,6 @@ jobs:
 
       - name: Verify index coverage before publishing
         shell: bash
-        env:
-          MAX_RECORDS: ${{ inputs.max_records }}
         run: |
           set -euo pipefail
           node --input-type=module -e '
@@ -181,8 +179,6 @@ jobs:
 
       - name: Publish complete index or isolated staging test
         shell: bash
-        env:
-          MAX_RECORDS: ${{ inputs.max_records }}
         run: |
           set -euo pipefail
           if [ "$MAX_RECORDS" = "0" ]; then
