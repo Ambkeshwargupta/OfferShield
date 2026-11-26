@@ -123,6 +123,42 @@ test("scheduled cleanup removes expired cache, observations and old rate buckets
   assert.ok(queries.some(q=>q.sql.includes("DELETE FROM rate_limits")));
 });
 
+test("GST verification returns a manual fallback when no authorised provider is configured",async()=>{
+  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/gst/verify?gstin=27AAPFU0939F1ZV"),env(),ctx);
+  const body=await response.json();
+  assert.equal(response.status,503);
+  assert.equal(body.configured,false);
+  assert.equal(body.manualLookup,"https://services.gst.gov.in/services/searchtp");
+  assert.equal(body.error.code,"gst_provider_not_configured");
+});
+test("GST verification rejects malformed GSTIN values before contacting a provider",async()=>{
+  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/gst/verify?gstin=not-a-gstin"),env({GST_GSP_LOOKUP_URL:"https://provider.example/gstin/{gstin}",GST_GSP_API_KEY:"secret"}),ctx);
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.verified,false);
+  assert.equal(body.error.code,"invalid_gstin");
+});
+test("GST verification calls only the configured HTTPS GSP endpoint and normalizes taxpayer fields",async()=>{
+  const originalFetch=globalThis.fetch;
+  let requestedUrl=null,requestedHeaders=null;
+  globalThis.fetch=async(input,init)=>{
+    requestedUrl=new URL(input);requestedHeaders=new Headers(init.headers);
+    return new Response(JSON.stringify({data:{lgnm:"EXAMPLE PRIVATE LIMITED",tradeNam:"EXAMPLE",rgdt:"01/01/2020",sts:"Active",ctb:"Private Limited Company",pradr:"Rewa, Madhya Pradesh"}}),{status:200,headers:{"content-type":"application/json"}});
+  };
+  try{
+    const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/gst/verify?gstin=27AAPFU0939F1ZV"),env({GST_GSP_LOOKUP_URL:"https://provider.example/v1/gst/{gstin}",GST_GSP_API_KEY:"secret",GST_GSP_AUTH_HEADER:"x-api-key"}),ctx);
+    const body=await response.json();
+    assert.equal(response.status,200);
+    assert.equal(requestedUrl.href,"https://provider.example/v1/gst/27AAPFU0939F1ZV");
+    assert.equal(requestedHeaders.get("x-api-key"),"secret");
+    assert.equal(body.verified,true);
+    assert.equal(body.profile.legalName,"EXAMPLE PRIVATE LIMITED");
+    assert.equal(body.profile.tradeName,"EXAMPLE");
+    assert.equal(body.profile.status,"Active");
+    assert.equal(body.profile.evidenceStatus,"authorised_provider_response");
+  }finally{globalThis.fetch=originalFetch}
+});
+
 test("Udyam route requires State and District filters", async()=>{
   const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/udyam/search"),env({DATA_GOV_API_KEY:"test-key"}),ctx);
   const body=await response.json();
