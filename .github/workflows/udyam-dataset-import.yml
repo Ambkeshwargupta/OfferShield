@@ -1,0 +1,48 @@
+name: UDYAM district dataset import
+on:
+  workflow_dispatch:
+    inputs:
+      districts_file:
+        description: Repository path to an official State/District JSON manifest
+        required: true
+        default: data/udyam-districts.json
+      max_pages_per_district:
+        description: Test limit per district (use 1 for a smoke test; 0 for all pages)
+        required: true
+        default: "1"
+permissions:
+  contents: read
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate secrets and district manifest
+        env:
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+          DATA_GOV_UDYAM_RESOURCE_ID: 8b68ae56-84cf-4728-a0a6-1be11028dea7
+        run: |
+          test -n "$DATA_GOV_API_KEY" || (echo "Missing DATA_GOV_API_KEY repository secret" && exit 1)
+          test -f "${{ inputs.districts_file }}" || (echo "District manifest not found: ${{ inputs.districts_file }}" && exit 1)
+      - name: Download filtered OGD pages (resumable within the workflow run)
+        env:
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+          DATA_GOV_UDYAM_RESOURCE_ID: 8b68ae56-84cf-4728-a0a6-1be11028dea7
+        run: |
+          LIMIT="${{ inputs.max_pages_per_district }}"
+          if [ "$LIMIT" = "0" ]; then
+            node scripts/udyam-download.mjs --districts="${{ inputs.districts_file }}" --output=.data/udyam --resume
+          else
+            node scripts/udyam-download.mjs --districts="${{ inputs.districts_file }}" --output=.data/udyam --max-pages-per-district="$LIMIT"
+          fi
+      - name: Upload run output as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: offershield-udyam-pages
+          path: .data/udyam/
+          if-no-files-found: error
+          retention-days: 14
