@@ -293,6 +293,73 @@ function filterUdyamRows(rows, query = "") {
   );
 }
 
+const GST_MANUAL_LOOKUP_URL = "https://services.gst.gov.in/services/searchtp";
+function normalizeGstProfile(payload, gstin) {
+  const root = payload?.data || payload?.result || payload?.response || payload;
+  const profile = root?.taxpayer || root?.taxpayerDetails || root?.details || root;
+  const pick = (...keys) => {
+    for (const key of keys) {
+      const value = profile?.[key] ?? profile?.[key.toLowerCase()];
+      if (value !== undefined && value !== null && String(value).trim() !== "") return String(value).trim();
+    }
+    return null;
+  };
+  return {
+    gstin,
+    legalName:pick("lgnm","legalName","legal_name","legal_name_of_business"),
+    tradeName:pick("tradeNam","tradeName","trade_name"),
+    registrationDate:pick("rgdt","registrationDate","registration_date"),
+    constitution:pick("ctb","constitution","constitution_of_business"),
+    status:pick("sts","status","gstinStatus","gstin_status"),
+    cancellationDate:pick("cxdt","cancellationDate","cancellation_date"),
+    principalPlaceOfBusiness:pick("pradr","principalPlaceOfBusiness","principal_place_of_business","address"),
+    taxpayerType:pick("dty","taxpayerType","taxpayer_type"),
+    source:"GST Suvidha Provider / authorised ASP response",
+    sourceUrl:GST_MANUAL_LOOKUP_URL,
+    evidenceStatus:"authorised_provider_response",
+    retrievedAt:new Date().toISOString()
+  };
+}
+async function gstinVerify(env, gstinValue) {
+  const gstin=cleanText(gstinValue,20).trim().toUpperCase();
+  if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin)) {
+    return {configured:!!(env.GST_GSP_LOOKUP_URL&&env.GST_GSP_API_KEY),gstin,verified:false,error:{code:"invalid_gstin",message:"Enter a structurally valid 15-character GSTIN."},manualLookup:GST_MANUAL_LOOKUP_URL};
+  }
+  if (!env.GST_GSP_LOOKUP_URL || !env.GST_GSP_API_KEY) {
+    return {configured:false,gstin,verified:false,error:{code:"gst_provider_not_configured",message:"Live GST verification requires an authorised GSTN GSP/ASP API contract and Worker secrets. No scraping or CAPTCHA bypass is used."},manualLookup:GST_MANUAL_LOOKUP_URL};
+  }
+  if (!env.GST_GSP_LOOKUP_URL.includes("{gstin}")) {
+    return {configured:false,gstin,verified:false,error:{code:"gst_provider_url_invalid",message:"GST_GSP_LOOKUP_URL must be the provider's documented HTTPS endpoint template containing {gstin}."},manualLookup:GST_MANUAL_LOOKUP_URL};
+  }
+  const cacheKey="gst-gsp:"+gstin;
+  const cached=await cachedGet(env,cacheKey);
+  if(cached) return {...cached,cached:true};
+  let endpoint;
+  try { endpoint=new URL(env.GST_GSP_LOOKUP_URL.replaceAll("{gstin}",encodeURIComponent(gstin))); }
+  catch { return {configured:true,gstin,verified:false,error:{code:"gst_provider_url_invalid",message:"The configured GST provider endpoint is not a valid URL."},manualLookup:GST_MANUAL_LOOKUP_URL}; }
+  if(endpoint.protocol!=="https:") return {configured:true,gstin,verified:false,error:{code:"gst_provider_https_required",message:"GST provider endpoint must use HTTPS."},manualLookup:GST_MANUAL_LOOKUP_URL};
+  const headerName=String(env.GST_GSP_AUTH_HEADER||"x-api-key").trim();
+  if(!/^[A-Za-z0-9-]{1,64}$/.test(headerName)) return {configured:true,gstin,verified:false,error:{code:"gst_provider_header_invalid",message:"Invalid GST provider authentication header name."},manualLookup:GST_MANUAL_LOOKUP_URL};
+  const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),10000);
+  try {
+    const upstream=await fetch(endpoint,{headers:{accept:"application/json",[headerName]:env.GST_GSP_API_KEY},signal:controller.signal});
+    if(!upstream.ok) return {configured:true,gstin,verified:false,error:{code:upstream.status===429?"provider_rate_limited":"gst_provider_error",status:upstream.status,message:"The authorised GST provider did not return a successful verification response."},manualLookup:GST_MANUAL_LOOKUP_URL};
+    const payload=await upstream.json();
+    if(payload?.success===false||payload?.valid===false||payload?.error) {
+      const result={configured:true,gstin,verified:false,found:false,providerMessage:cleanText(payload.message||payload.error_description||"Provider did not confirm this GSTIN.",240),source:"authorised_gsp"};
+      await cachedPut(env,cacheKey,result,300);
+      return {...result,manualLookup:GST_MANUAL_LOOKUP_URL};
+    }
+    const profile=normalizeGstProfile(payload,gstin);
+    const found=!!(profile.legalName||profile.tradeName||profile.status);
+    const result={configured:true,gstin,verified:found,found,profile,source:"authorised_gsp",manualLookup:GST_MANUAL_LOOKUP_URL,note:found?"Fields are mapped from the configured authorised provider response. Confirm material discrepancies with the GST portal.":"Provider response did not contain recognised taxpayer identity fields; no verification conclusion is made."};
+    if(found) await cachedPut(env,cacheKey,result,3600);
+    return result;
+  } catch(error) {
+    return {configured:true,gstin,verified:false,error:{code:"gst_provider_unavailable",message:error.name==="AbortError"?"GST provider request timed out.":"Could not reach the configured GST provider."},manualLookup:GST_MANUAL_LOOKUP_URL};
+  } finally { clearTimeout(timer); }
+}
+
 async function wikidataSearch(query) {
   const url = new URL("https://www.wikidata.org/w/api.php");
   url.search = new URLSearchParams({ action:"wbsearchentities", search:query, language:"en", uselang:"en", format:"json", limit:"8", origin:"*" }).toString();
@@ -1429,7 +1496,7 @@ async function route(request, env) {
   }
   if (url.pathname === "/health" || url.pathname === "/v1/health") {
     const communityReady = await communitySchemaConfigured(env);
-    return response({ ok:true, service:"OfferShield Intelligence API", version:"1.7.0", officialOgdConfigured:!!env.DATA_GOV_API_KEY, webSearchConfigured:!!env.TAVILY_API_KEY, d1Configured:!!env.DB, communityIntelligenceConfigured:communityReady, companyIndexConfigured:!!env.COMPANY_INDEX, aiConfigured:!!env.AI, documentConversionConfigured:!!(env.AI && typeof env.AI.toMarkdown === "function"), checkedAt:new Date().toISOString() },200,origin);
+    return response({ ok:true, service:"OfferShield Intelligence API", version:"1.7.0", officialOgdConfigured:!!env.DATA_GOV_API_KEY, webSearchConfigured:!!env.TAVILY_API_KEY, d1Configured:!!env.DB, communityIntelligenceConfigured:communityReady, companyIndexConfigured:!!env.COMPANY_INDEX, aiConfigured:!!env.AI, documentConversionConfigured:!!(env.AI && typeof env.AI.toMarkdown === "function"), gstProviderConfigured:!!(env.GST_GSP_LOOKUP_URL && env.GST_GSP_API_KEY), checkedAt:new Date().toISOString() },200,origin);
   }
   if (!url.pathname.startsWith("/v1/")) return jsonError("Route not found.",404,origin,"not_found");
   if (!await rateLimit(request,env)) return jsonError("Rate limit reached. Please retry in one minute.",429,origin,"rate_limited");
@@ -1487,6 +1554,14 @@ async function route(request, env) {
     };
     return response(result,200,origin);
   }
+  if (request.method === "GET" && url.pathname === "/v1/gst/verify") {
+    const gstin=cleanText(url.searchParams.get("gstin"),20).trim();
+    if(!gstin) return jsonError("Provide a GSTIN query parameter.",400,origin,"gstin_required");
+    const result=await gstinVerify(env,gstin);
+    if(result.error?.code==="gst_provider_not_configured") return response(result,503,origin);
+    if(result.error?.code==="gst_provider_error"||result.error?.code==="provider_rate_limited"||result.error?.code==="gst_provider_unavailable") return response(result,502,origin);
+    return response(result,200,origin);
+  }
   if (request.method === "GET" && url.pathname === "/v1/udyam/search") {
     const state = cleanText(url.searchParams.get("state"),100).trim();
     const district = cleanText(url.searchParams.get("district"),100).trim();
@@ -1538,6 +1613,7 @@ async function route(request, env) {
         {id:"mca_national_index",name:"National MCA full-text company index",configured:!!env.DB,mode:env.DB?"Requires 0002 migration and bulk data import":"Requires D1 binding, migration and bulk data import",coverage:"Searches imported MCA company master data locally using FTS5; coverage is limited to the snapshot actually imported"},
         {id:"mca_r2_index",name:"National MCA token index in Cloudflare R2",configured:!!env.COMPANY_INDEX,mode:env.COMPANY_INDEX?"R2 bucket bound; requires national index upload":"Requires an R2 bucket binding and national index upload",coverage:"Searches imported MCA company and LLP names through token-prefix shards; only imported snapshot records are covered"},
         {id:"udyam_ogd",name:"MSME registered units under UDYAM via data.gov.in",configured:!!env.DATA_GOV_API_KEY,mode:env.DATA_GOV_API_KEY?"Live API connector; State and District required":"Requires DATA_GOV_API_KEY secret",coverage:"EnterpriseName, State, District, Pincode, RegistrationDate, CommunicationAddress and Activities. Udyam Registration Number is not exposed by this resource."},
+        {id:"gst_gsp",name:"GSTIN taxpayer verification via authorised GSP/ASP",configured:!!(env.GST_GSP_LOOKUP_URL && env.GST_GSP_API_KEY),mode:env.GST_GSP_LOOKUP_URL&&env.GST_GSP_API_KEY?"Configured provider adapter":"Requires authorised provider contract and Worker secrets",coverage:"Single GSTIN verification; field mapping depends on the contracted provider response. No bulk GST database or CAPTCHA scraping."},
         {id:"wikidata",name:"Wikidata company discovery",configured:true,mode:"Public API",coverage:"Third-party discovery candidates only"},
         {id:"dns",name:"DNS email and domain checks",configured:true,mode:"Google Public DNS-over-HTTPS",coverage:"A, AAAA, MX, TXT, NS and DMARC TXT records"},
         {id:"rdap",name:"Domain registration lookup",configured:true,mode:"RDAP public lookup",coverage:"Public registration data; may be redacted or unavailable"},
@@ -1546,7 +1622,7 @@ async function route(request, env) {
         {id:"community_recruitment_intelligence",name:"Community Recruitment Intelligence",configured:!!env.DB,mode:env.DB?"D1 connected; requires 0003 migration and moderation":"Requires D1 binding and 0003 migration",coverage:"Opt-in structured, anonymised, moderated student recruitment experiences; aggregate patterns only after at least three approved reports, retrieved as AI context rather than model fine-tuning."},
         {id:"digital_footprint_search",name:"Company digital-footprint research",configured:!!env.TAVILY_API_KEY,mode:env.TAVILY_API_KEY?"Tavily Search connected":"Requires TAVILY_API_KEY",coverage:"Searches company websites, public LinkedIn pages, history/news, partner and incubated-startup networks, and jobs/employee reviews. Results are indexed evidence, not direct LinkedIn verification."}
       ],
-      limitations:["No LinkedIn scraping or private recruiter data access.","No inference of recruiter employment from a public profile.","GST verification remains an official manual lookup. The Udyam dataset search is a location-filtered enterprise list and does not expose Udyam Registration Numbers.","No automated vacancy/offer authenticity claim. AI internship/offer analysis is an evidence review only; company-specific recruitment stages are not inferred when source evidence is missing."]
+      limitations:["No LinkedIn scraping or private recruiter data access.","No inference of recruiter employment from a public profile.","GST live verification uses an authorised GSP/ASP only when configured; otherwise the official manual lookup is provided. No public bulk GSTIN dataset is assumed. The Udyam dataset search is a location-filtered enterprise list and does not expose Udyam Registration Numbers.","No automated vacancy/offer authenticity claim. AI internship/offer analysis is an evidence review only; company-specific recruitment stages are not inferred when source evidence is missing."]
     },200,origin);
   }
   return jsonError("Route not found.",404,origin,"not_found");
