@@ -55,6 +55,14 @@ OfferShield is an India-first company and recruitment due-diligence platform foc
 - Screenshot/document evidence extraction, domain DNS/RDAP and pasted email-header clues, MCA indexed-name/CIN lookup, regional Udyam enterprise discovery and Wikidata candidates, plus structured student-facing assessment and, when D1 is configured, company-published verification contact cross-checks.
 - D1-backed API response cache and rate limit buckets when D1 is configured.
 
+### Recruiter, vacancy and cross-evidence verification
+
+- Evidence-led opportunity assessment endpoint: `POST /v1/verify-opportunity`. It compares supplied company, recruiter, vacancy and offer details, surfaces mismatches and provides practical verification steps.
+- Ephemeral evidence relationship graph endpoint: `POST /v1/evidence-graph`. It connects entities in one investigation only; it does not persist cross-user identity links or publish allegations.
+- Both endpoints distinguish company registration evidence from recruiter authority and vacancy confirmation. User-entered confirmation flags are not independent OfferShield verification.
+- A Manifest V3 browser-extension starter is available in `browser-extension/`. It copies the current public page title and URL for manual review; it does not scrape private profiles or automatically classify job listings.
+- The full product roadmap, integration dependencies and production blockers are documented in `docs/VERIFICATION_ENGINE.md`.
+
 ### Public internship-fraud pattern intelligence
 
 - OfferShield now includes a curated, source-linked public-case reference covering reported internship deposits, unpaid stipends, recruiter impersonation, false offer documents and adjacent fresher-job / task scams.
