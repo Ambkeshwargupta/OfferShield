@@ -1518,16 +1518,20 @@ async function route(request, env) {
   if (request.method === "POST" && url.pathname === "/v1/verify-opportunity") {
     const declaredLength=Number(request.headers.get("content-length")||0);
     if(declaredLength>32000) return jsonError("Verification payload exceeds the 32 KB limit.",413,origin,"payload_too_large");
-    let body;
-    try { body=await request.json(); } catch { return jsonError("Send a valid JSON evidence object.",400,origin,"invalid_json"); }
+    let rawBody, body;
+    try { rawBody=await request.text(); } catch { return jsonError("Could not read request body.",400,origin,"invalid_body"); }
+    if(rawBody.length>32000) return jsonError("Verification payload exceeds the 32 KB limit.",413,origin,"payload_too_large");
+    try { body=JSON.parse(rawBody); } catch { return jsonError("Send a valid JSON evidence object.",400,origin,"invalid_json"); }
     if(!body || typeof body!=="object" || Array.isArray(body)) return jsonError("Send a JSON object.",400,origin,"invalid_body");
     return response({report:assessOpportunity(body)},200,origin);
   }
   if (request.method === "POST" && url.pathname === "/v1/evidence-graph") {
     const declaredLength=Number(request.headers.get("content-length")||0);
     if(declaredLength>32000) return jsonError("Verification payload exceeds the 32 KB limit.",413,origin,"payload_too_large");
-    let body;
-    try { body=await request.json(); } catch { return jsonError("Send a valid JSON evidence object.",400,origin,"invalid_json"); }
+    let rawBody, body;
+    try { rawBody=await request.text(); } catch { return jsonError("Could not read request body.",400,origin,"invalid_body"); }
+    if(rawBody.length>32000) return jsonError("Verification payload exceeds the 32 KB limit.",413,origin,"payload_too_large");
+    try { body=JSON.parse(rawBody); } catch { return jsonError("Send a valid JSON evidence object.",400,origin,"invalid_json"); }
     if(!body || typeof body!=="object" || Array.isArray(body)) return jsonError("Send a JSON object.",400,origin,"invalid_body");
     return response({graph:buildEvidenceGraph(body)},200,origin);
   }
