@@ -722,7 +722,7 @@ test("opportunity verification separates company, recruiter and vacancy evidence
  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/verify-opportunity",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)}),env(),ctx);
  const body=await response.json();
  assert.equal(response.status,200);
- assert.equal(body.report.dimensions.company.status,"registry_evidence_supplied");
+ assert.equal(body.report.dimensions.company.status,"registry_details_user_supplied");
  assert.equal(body.report.overallStatus,"urgent_review");
  assert.ok(body.report.findings.some(x=>x.id==="recruiter_domain_mismatch"));
  assert.ok(body.report.findings.some(x=>x.id==="vacancy_domain_mismatch"));
