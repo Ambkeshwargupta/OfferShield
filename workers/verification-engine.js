@@ -48,7 +48,7 @@ export function assessOpportunity(input={}) {
   if (company.registryName && company.name) {
     const match = canonical(company.registryName) === canonical(company.name);
     comparisons.push({ field:"company_name", state:match?"consistent":"mismatch", supplied:company.name, registry:company.registryName });
-    if (!match) addFinding(findings,"company_name_mismatch","high","Company name differs from registry evidence","The supplied company name does not exactly match the provided registry name. Check legal name, trade name and entity identity.",["candidate_input","registry_evidence"]);
+    if (!match) addFinding(findings,"company_name_mismatch","high","Company name differs from the registry name supplied","The supplied company name does not exactly match the registry name entered in this form. Confirm the legal name, trade name and entity identity against the original source.",["candidate_input","registry_evidence"]);
   } else {
     comparisons.push({field:"company_name",state:"not_checked"});
   }
