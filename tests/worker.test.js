@@ -716,3 +716,29 @@ test("new-offer review rejects missing quick answers and does not require a type
  const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/investigate",{method:"POST",body:form}),env({AI:{async toMarkdown(){return[]},async run(){throw new Error("AI must not run before validation")}}}),ctx);
  const body=await response.json();assert.equal(response.status,400);assert.equal(body.error.code,"screening_required");
 });
+
+test("opportunity verification separates company, recruiter and vacancy evidence",async()=>{
+ const payload={company:{name:"Acme Private Limited",officialDomain:"acme.example",registryName:"Acme Private Limited"},recruiter:{name:"HR",email:"hr@lookalike.example"},vacancy:{title:"Software Intern",officialUrl:"https://jobs.lookalike.example/123"},offer:{companyName:"Different Company",paymentRequested:true}};
+ const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/verify-opportunity",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)}),env(),ctx);
+ const body=await response.json();
+ assert.equal(response.status,200);
+ assert.equal(body.report.dimensions.company.status,"registry_evidence_supplied");
+ assert.equal(body.report.overallStatus,"urgent_review");
+ assert.ok(body.report.findings.some(x=>x.id==="recruiter_domain_mismatch"));
+ assert.ok(body.report.findings.some(x=>x.id==="vacancy_domain_mismatch"));
+ assert.ok(body.report.findings.some(x=>x.id==="payment_requested"));
+ assert.ok(body.report.limitations.some(x=>x.includes("does not independently verify")));
+});
+test("evidence graph is ephemeral and never claims a verified relationship",async()=>{
+ const payload={company:{name:"Acme",officialDomain:"acme.example"},recruiter:{name:"Alex",email:"alex@acme.example"},vacancy:{title:"Intern"}};
+ const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/evidence-graph",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)}),env(),ctx);
+ const body=await response.json();
+ assert.equal(response.status,200);
+ assert.equal(body.graph.persistence,"ephemeral_request_only");
+ assert.ok(body.graph.edges.some(x=>x.relationship==="claims_association_with"));
+ assert.ok(body.graph.limitations.some(x=>x.includes("not a verified real-world relationship")));
+});
+test("opportunity verification rejects malformed JSON",async()=>{
+ const response=await worker.fetch(new Request("https://api.example.workers.dev/v1/verify-opportunity",{method:"POST",headers:{"content-type":"application/json"},body:"{"}),env(),ctx);
+ assert.equal(response.status,400);
+});
