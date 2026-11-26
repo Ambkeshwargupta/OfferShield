@@ -4,6 +4,7 @@ import {
 } from "./intelligence-core.js";
 import { evaluateFraudPatterns } from "./fraud-patterns.js";
 import { calculateRiskAssessment } from "./risk-assessment.js";
+import { assessOpportunity, buildEvidenceGraph } from "./verification-engine.js";
 
 const DEFAULT_OGD_RESOURCE = "4dbe5667-7b6b-41d7-82af-211562424d9a";
 const ALLOWED_ORIGINS = new Set([
@@ -1514,6 +1515,22 @@ async function route(request, env) {
   if (request.method === "POST" && url.pathname === "/v1/investigate") {
     return analyseInternshipUpload(request,env,origin);
   }
+  if (request.method === "POST" && url.pathname === "/v1/verify-opportunity") {
+    const declaredLength=Number(request.headers.get("content-length")||0);
+    if(declaredLength>32000) return jsonError("Verification payload exceeds the 32 KB limit.",413,origin,"payload_too_large");
+    let body;
+    try { body=await request.json(); } catch { return jsonError("Send a valid JSON evidence object.",400,origin,"invalid_json"); }
+    if(!body || typeof body!=="object" || Array.isArray(body)) return jsonError("Send a JSON object.",400,origin,"invalid_body");
+    return response({report:assessOpportunity(body)},200,origin);
+  }
+  if (request.method === "POST" && url.pathname === "/v1/evidence-graph") {
+    const declaredLength=Number(request.headers.get("content-length")||0);
+    if(declaredLength>32000) return jsonError("Verification payload exceeds the 32 KB limit.",413,origin,"payload_too_large");
+    let body;
+    try { body=await request.json(); } catch { return jsonError("Send a valid JSON evidence object.",400,origin,"invalid_json"); }
+    if(!body || typeof body!=="object" || Array.isArray(body)) return jsonError("Send a JSON object.",400,origin,"invalid_body");
+    return response({graph:buildEvidenceGraph(body)},200,origin);
+  }
   if (request.method === "POST" && url.pathname === "/v1/community/reports") {
     return submitCommunityRecruitmentReport(request,env,origin);
   }
@@ -1631,7 +1648,9 @@ async function route(request, env) {
         {id:"email_headers",name:"Raw email header analysis",configured:true,mode:"Local parsing in Worker",coverage:"Header fields and reported SPF/DKIM/DMARC results; original headers must be authentic"},
         {id:"internship_offer_ai",name:"AI internship and offer evidence review",configured:!!env.AI,mode:env.AI?"Workers AI binding enabled":"Requires Workers AI binding",coverage:"Reads PDF, DOCX and screenshots; analyses offer terms, explicit recruitment stages, risk signals and evidence gaps without certifying authenticity."},
         {id:"community_recruitment_intelligence",name:"Community Recruitment Intelligence",configured:!!env.DB,mode:env.DB?"D1 connected; requires 0003 migration and moderation":"Requires D1 binding and 0003 migration",coverage:"Opt-in structured, anonymised, moderated student recruitment experiences; aggregate patterns only after at least three approved reports, retrieved as AI context rather than model fine-tuning."},
-        {id:"digital_footprint_search",name:"Company digital-footprint research",configured:!!env.TAVILY_API_KEY,mode:env.TAVILY_API_KEY?"Tavily Search connected":"Requires TAVILY_API_KEY",coverage:"Searches company websites, public LinkedIn pages, history/news, partner and incubated-startup networks, and jobs/employee reviews. Results are indexed evidence, not direct LinkedIn verification."}
+        {id:"digital_footprint_search",name:"Company digital-footprint research",configured:!!env.TAVILY_API_KEY,mode:env.TAVILY_API_KEY?"Tavily Search connected":"Requires TAVILY_API_KEY",coverage:"Searches company websites, public LinkedIn pages, history/news, partner and incubated-startup networks, and jobs/employee reviews. Results are indexed evidence, not direct LinkedIn verification."},
+        {id:"recruiter_vacancy_consistency",name:"Recruiter and vacancy evidence consistency",configured:true,mode:"Evidence-led request analysis",coverage:"Compares supplied company, recruiter, vacancy and offer fields; does not independently authenticate a recruiter or vacancy."},
+        {id:"evidence_graph",name:"Ephemeral investigation evidence graph",configured:true,mode:"Per-request graph",coverage:"Builds relationships only from evidence supplied in one request; no cross-user graph or persistent personal-data collection."}
       ],
       limitations:["No LinkedIn scraping or private recruiter data access.","No inference of recruiter employment from a public profile.","GST live verification uses an authorised GSP/ASP only when configured; otherwise the official manual lookup is provided. No public bulk GSTIN dataset is assumed. The Udyam dataset search is a location-filtered enterprise list and does not expose Udyam Registration Numbers.","No automated vacancy/offer authenticity claim. AI internship/offer analysis is an evidence review only; company-specific recruitment stages are not inferred when source evidence is missing."]
     },200,origin);
