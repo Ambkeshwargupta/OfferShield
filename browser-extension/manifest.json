@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "OfferShield — Recruitment Check",
+  "version": "0.1.0",
+  "description": "Send the current recruitment or job page to OfferShield for a manual evidence review.",
+  "permissions": ["activeTab", "clipboardWrite"],
+  "action": {
+    "default_title": "Investigate with OfferShield",
+    "default_popup": "popup.html"
+  }
+}
