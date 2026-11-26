@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Compare company, recruiter, vacancy and offer evidence with OfferShield.">
+<title>Opportunity Verification — OfferShield</title>
+<style>
+:root{--ink:#172033;--muted:#667286;--line:#e2e7f0;--blue:#3459d5;--bg:#f5f7fb;--red:#a92f3d;--amber:#98600d;--green:#16724d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 Inter,system-ui,sans-serif}.wrap{max-width:1040px;margin:0 auto;padding:32px 20px 70px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}.brand{font-weight:800;font-size:18px;color:var(--ink);text-decoration:none}.top a{color:var(--blue);text-decoration:none}.hero{padding:28px;border-radius:20px;background:linear-gradient(120deg,#172747,#3459a5);color:white;margin-bottom:20px}.hero h1{font-size:30px;line-height:1.15;margin:0 0 9px}.hero p{color:#d3def8;margin:0;max-width:750px}.card{background:white;border:1px solid var(--line);border-radius:16px;padding:22px;margin:15px 0}.card h2{font-size:17px;margin:0 0 16px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.field{display:grid;gap:6px}.field.full{grid-column:1/-1}label{font-size:12px;font-weight:700;color:#344159}input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;font:inherit}input:focus{outline:2px solid #3459d533;border-color:var(--blue)}.check{display:flex;gap:9px;align-items:center;margin-top:8px}.check input{width:auto}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}button,.button{border:0;border-radius:9px;padding:11px 16px;background:var(--blue);color:white;font-weight:700;cursor:pointer;text-decoration:none}button.secondary,.button.secondary{background:white;color:var(--ink);border:1px solid var(--line)}button:disabled{opacity:.6;cursor:wait}.note{font-size:11px;color:var(--muted)}#status{margin:12px 0;color:var(--muted)}#report{display:none}.pill{display:inline-block;padding:5px 9px;border-radius:30px;background:#fff3dc;color:var(--amber);font-size:11px;font-weight:750}.finding{padding:13px 0;border-top:1px solid var(--line)}.finding b{display:block}.finding p{margin:4px 0 0;color:var(--muted)}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f7fb;padding:14px;border-radius:10px;font-size:11px;max-height:420px;overflow:auto}.footer{color:var(--muted);font-size:11px;margin-top:22px}@media(max-width:650px){.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.hero h1{font-size:25px}.top{align-items:flex-start;gap:10px}}
+</style>
+</head>
+<body><main class="wrap">
+<div class="top"><a class="brand" href="./">◈ OfferShield</a><a href="./">Back to dashboard →</a></div>
+<section class="hero"><h1>Verify the opportunity, not just the company.</h1><p>Compare the company identity, recruiter contact, specific vacancy and offer details. OfferShield highlights inconsistencies and next steps. It does not certify authenticity or independently contact employers.</p></section>
+<form id="form">
+<section class="card"><h2>1. Company identity</h2><div class="grid">
+<div class="field"><label for="company">Company name</label><input id="company" required placeholder="Example Technologies Pvt Ltd"></div>
+<div class="field"><label for="domain">Official website/domain</label><input id="domain" placeholder="example.com"></div>
+<div class="field"><label for="registry">Registry legal name (if found)</label><input id="registry" placeholder="Name from MCA/GST/other source"></div>
+<div class="field"><label for="source">Registry source</label><input id="source" placeholder="MCA OGD / GST GSP / other"></div>
+</div></section>
+<section class="card"><h2>2. Recruiter details</h2><div class="grid">
+<div class="field"><label for="recruiter">Recruiter name</label><input id="recruiter" placeholder="Name shown in communication"></div>
+<div class="field"><label for="email">Recruiter email</label><input id="email" type="email" placeholder="hr@example.com"></div>
+</div><label class="check"><input id="recruiterConfirmed" type="checkbox"> I independently contacted the company using contact details found separately and confirmed this recruiter.</label></section>
+<section class="card"><h2>3. Specific vacancy</h2><div class="grid">
+<div class="field"><label for="job">Job/internship title</label><input id="job" placeholder="Software Engineering Intern"></div>
+<div class="field"><label for="jobid">Job ID</label><input id="jobid" placeholder="INT-2026-04"></div>
+<div class="field full"><label for="joburl">Official careers/vacancy URL</label><input id="joburl" type="url" placeholder="https://example.com/careers"></div>
+</div><label class="check"><input id="vacancyConfirmed" type="checkbox"> The employer independently confirmed this exact vacancy.</label></section>
+<section class="card"><h2>4. Offer details</h2><div class="grid">
+<div class="field"><label for="offerCompany">Company name written on offer</label><input id="offerCompany" placeholder="Name on the offer letter"></div>
+<div class="field"><label for="offerEmail">Recruiter email written on offer</label><input id="offerEmail" type="email" placeholder="Email printed on offer"></div>
+<div class="field"><label for="pay">Salary/stipend</label><input id="pay" placeholder="₹15,000/month"></div>
+<div class="field"><label for="location">Work location</label><input id="location" placeholder="Remote / Pune / etc."></div>
+</div><label class="check"><input id="payment" type="checkbox"> The recruiter/company asked me to pay money for this job or internship.</label></section>
+<section class="card"><h2>5. API connection</h2><div class="field"><label for="api">OfferShield Worker API base URL</label><input id="api" value="https://offershield-intelligence.official-ambkeshwargupta.workers.dev"></div><p class="note">Only the structured fields above are sent to the configured Worker. Do not enter Aadhaar, PAN, bank details, passwords or unrelated personal data.</p>
+<div class="actions"><button id="submit" type="submit">Generate evidence review</button><button class="secondary" id="reset" type="reset">Clear form</button></div><p id="status" role="status"></p></section>
+</form>
+<section class="card" id="report"><h2>Investigation result</h2><div id="summary"></div><div class="actions"><button class="secondary" id="download">Download JSON report</button><button class="secondary" id="copy">Copy report</button></div><h3>Full evidence report</h3><pre id="json"></pre></section>
+<p class="footer">Evidence before conclusions. A registry record does not prove recruiter authority. A matching email domain does not prove an offer is genuine. A missing record is not proof of fraud or safety.</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);let lastReport=null;
+$("form").addEventListener("submit",async event=>{
+ event.preventDefault();const button=$("submit");button.disabled=true;$("status").textContent="Reviewing the supplied evidence…";
+ const payload={
+  company:{name:$("company").value,officialDomain:$("domain").value,registryName:$("registry").value,registrySource:$("source").value},
+  recruiter:{name:$("recruiter").value,email:$("email").value,independentlyConfirmed:$("recruiterConfirmed").checked},
+  vacancy:{title:$("job").value,jobId:$("jobid").value,officialUrl:$("joburl").value,confirmedByCompany:$("vacancyConfirmed").checked},
+  offer:{companyName:$("offerCompany").value,recruiterEmail:$("offerEmail").value,salaryOrStipend:$("pay").value,location:$("location").value,paymentRequested:$("payment").checked}
+ };
+ try{
+  const base=$("api").value.trim().replace(/\/+$/,"");const response=await fetch(base+"/v1/verify-opportunity",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+  const body=await response.json();if(!response.ok)throw new Error(body.message||body.error?.message||"The verification service returned an error.");
+  lastReport=body.report;$("report").style.display="block";$("summary").innerHTML="";
+  const status=document.createElement("span");status.className="pill";status.textContent=lastReport.overallStatus.replaceAll("_"," ").toUpperCase();$("summary").append(status);
+  for(const item of lastReport.findings){const div=document.createElement("div");div.className="finding";const title=document.createElement("b");title.textContent=item.title+" · "+item.severity.toUpperCase();const detail=document.createElement("p");detail.textContent=item.detail;div.append(title,detail);$("summary").append(div);}
+  if(!lastReport.findings.length){const p=document.createElement("p");p.textContent="No direct mismatch was identified in the fields supplied. This is not a safety clearance."; $("summary").append(p);}
+  $("json").textContent=JSON.stringify(lastReport,null,2);$("status").textContent="Review complete. Read the limitations and verify through an independent employer channel."; $("report").scrollIntoView({behavior:"smooth"});
+ }catch(error){$("status").textContent=error.message||"Unable to reach the OfferShield API. Check the API URL and connection.";}
+ finally{button.disabled=false;}
+});
+$("reset").addEventListener("click",()=>{lastReport=null;$("report").style.display="none";$("status").textContent="";});
+$("download").addEventListener("click",()=>{if(!lastReport)return;const blob=new Blob([JSON.stringify(lastReport,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="offershield-evidence-report.json";a.click();URL.revokeObjectURL(url);});
+$("copy").addEventListener("click",async()=>{if(lastReport){await navigator.clipboard.writeText(JSON.stringify(lastReport,null,2));$("status").textContent="Report copied."; }});
+</script></body></html>
