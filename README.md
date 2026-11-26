@@ -57,6 +57,8 @@ OfferShield is an India-first company and recruitment due-diligence platform foc
 
 ### Recruiter, vacancy and cross-evidence verification
 
+- Open the new [Opportunity Verification workspace](./docs/verify-opportunity.html) to compare company, recruiter, vacancy and offer details and download a JSON evidence report.
+
 - Evidence-led opportunity assessment endpoint: `POST /v1/verify-opportunity`. It compares supplied company, recruiter, vacancy and offer details, surfaces mismatches and provides practical verification steps.
 - Ephemeral evidence relationship graph endpoint: `POST /v1/evidence-graph`. It connects entities in one investigation only; it does not persist cross-user identity links or publish allegations.
 - Both endpoints distinguish company registration evidence from recruiter authority and vacancy confirmation. User-entered confirmation flags are not independent OfferShield verification.
