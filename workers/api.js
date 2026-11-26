@@ -670,7 +670,18 @@ async function resolveSearch(query, env) {
     return { query, identifier, registry: ogd.records.map(r => companyResponse(r)), registryConfigured: ogd.configured, registryError: ogd.error || null, discovery: candidates.slice(0, 8), manualLookup: "https://www.mcacdm.nic.in/company-master-details", notes: ["The OGD CompanyName filter is an exact match. Name variations and fuzzy matches are only discovery suggestions.", "Wikidata results are third-party candidates, not registry verification."] };
   }
   if (identifier.type === "GSTIN") {
-    return { query, identifier, registry: [], registryConfigured: false, discovery: [], manualLookup: "https://services.gst.gov.in/services/searchtp", notes: ["GST public taxpayer lookup remains an official manual verification route in this release."] };
+    const verification = await gstinVerify(env,identifier.value);
+    const profile = verification.profile;
+    return {
+      query, identifier,
+      registry:profile?[{identifier:verification.gstin,name:profile.legalName||profile.tradeName,status:profile.status,tradeName:profile.tradeName,registrationDate:profile.registrationDate,constitution:profile.constitution,registeredOffice:profile.principalPlaceOfBusiness,evidenceStatus:"authorised_provider_response",source:{name:"Authorised GST GSP/ASP",url:GST_MANUAL_LOOKUP_URL,retrievedAt:profile.retrievedAt}}]:[],
+      registryConfigured:verification.configured,
+      registryError:verification.error||null,
+      gstVerification:verification,
+      discovery:[],
+      manualLookup:GST_MANUAL_LOOKUP_URL,
+      notes:[verification.verified?"GSTIN profile returned by the configured authorised provider. This confirms only the taxpayer profile fields returned by that provider, not recruiter authority or offer authenticity.":"Live GST verification is not available or did not confirm a taxpayer profile. Use the official GST portal manual lookup; a missing result is not proof of fraud."]
+    };
   }
   return { query, identifier, registry: [], registryConfigured: false, discovery: await wikidataSearch(query), manualLookup: "https://www.mcacdm.nic.in/company-master-details" };
 }
