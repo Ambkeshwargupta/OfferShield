@@ -54,6 +54,33 @@ Do not put provider keys in frontend JavaScript or repository files. Store them 
 
 Official manual fallback: https://services.gst.gov.in/services/searchtp
 
+
+### Configure the Worker-side GSP adapter
+
+The Worker exposes `GET /v1/gst/verify?gstin=<15-character-GSTIN>`. It calls only the endpoint configured by you; the browser never receives the API key.
+
+After selecting a provider and receiving its documentation, configure these **Cloudflare Worker secrets/variables**:
+
+- `GST_GSP_LOOKUP_URL` — provider's documented HTTPS single-GSTIN endpoint with the literal placeholder `{gstin}`, for example `https://provider.example/api/taxpayer/{gstin}`. This is a format example only, not a real provider URL.
+- `GST_GSP_API_KEY` — provider-issued secret.
+- `GST_GSP_AUTH_HEADER` — optional variable naming the provider's API-key header; defaults to `x-api-key`. If the provider requires OAuth, signed requests, multiple headers or a token exchange, its adapter must be extended to that documented contract rather than forcing this simple API-key mode.
+
+The adapter maps common response aliases for legal name, trade name, registration date, constitution, status, cancellation date, principal place of business and taxpayer type. Check the mapping against the provider's real sandbox response before production. The endpoint deliberately returns only a small normalised field set, not the raw provider payload. Successful lookups are cached for one hour; provider-negative responses for five minutes. Change these TTLs only if the provider contract permits it.
+
+Do not configure this adapter with an unverified aggregator or scrape endpoint. Ask the provider to confirm its GSTN authorisation and your right to use/display taxpayer data for OfferShield. If it provides a different authentication flow or response structure, keep the credentials in Worker secrets and implement a provider-specific adapter after testing against its sandbox. Until then, the endpoint correctly returns the official manual lookup link and does not claim live verification.
+
+Example deployment commands (run from `workers/` after reviewing provider terms):
+
+```bash
+npx wrangler secret put GST_GSP_API_KEY
+npx wrangler secret put GST_GSP_LOOKUP_URL
+# GST_GSP_AUTH_HEADER is a non-secret variable if required:
+npx wrangler secret put GST_GSP_AUTH_HEADER
+npx wrangler deploy
+```
+
+Use Cloudflare Dashboard → Workers & Pages → offershield-intelligence → Settings → Variables and Secrets if the URL/header are configured as plain variables. Keep the API key as a secret.
+
 ## Recommended unified verification model
 
 For each company, retain independent evidence rows rather than collapsing all sources into one "verified" badge:
